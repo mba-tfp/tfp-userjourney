@@ -153,67 +153,30 @@ export function JourneyMap() {
         </header>
 
         {/* Stage strip */}
+        {/* Stage lifecycle ring */}
         <section className="relative">
-          <div className="mx-auto max-w-[1400px] px-2 sm:px-4">
-            <div className="group/strip relative">
-              <button
-                onClick={() => scrollStrip(-1)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover/strip:opacity-100 transition hover:bg-secondary"
-                aria-label="Scroll left"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => scrollStrip(1)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover/strip:opacity-100 transition hover:bg-secondary"
-                aria-label="Scroll right"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-              <div
-                ref={stripRef}
-                className="overflow-x-auto edge-fade-x snap-x snap-mandatory scroll-px-8 pt-8 pb-10 px-6"
-                style={{ scrollbarWidth: "thin" }}
-              >
-                <ol className="flex gap-4 items-stretch">
-                  {j.doc.stages.map((s, i) => {
-                    const active = s.id === selectedStageId;
-                    const dim = selectedStageId && !active;
-                    const onFire = showMoneyOnFire && !!s.onFire;
-                    return (
-                      <li
-                        key={s.id}
-                        className="snap-start"
-                      >
-                        <StageCard
-                          index={i}
-                          stage={s}
-                          active={active}
-                          dim={!!dim}
-                          onFire={onFire}
-                          valueTags={j.doc.valueTags}
-                          onSelect={() =>
-                            setSelectedStageId((cur) => (cur === s.id ? null : s.id))
-                          }
-                          onRename={(patch) => j.setStage(s.id, patch)}
-                          onValueChange={(valueTagId) => j.setStage(s.id, { valueTagId })}
-                          onToggleOnFire={() => j.toggleStageOnFire(s.id)}
-                          onManageValueTags={() => setTagManagerOpen(true)}
-                          onMove={(dir) => j.moveStage(s.id, dir)}
-                          onInsertAfter={() => j.addStage(i)}
-                          onDelete={() => {
-                            if (confirm(`Delete stage "${s.title}"?`)) {
-                              if (selectedStageId === s.id) setSelectedStageId(null);
-                              j.deleteStage(s.id);
-                            }
-                          }}
-                        />
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-            </div>
+          <div className="mx-auto max-w-[1400px] px-6 pt-8 pb-10">
+            <StageLifecycle
+              stages={j.doc.stages}
+              valueTags={j.doc.valueTags}
+              selectedStageId={selectedStageId}
+              showMoneyOnFire={showMoneyOnFire}
+              onSelect={(id) =>
+                setSelectedStageId((cur) => (cur === id ? null : id))
+              }
+              onRename={(id, patch) => j.setStage(id, patch)}
+              onValueChange={(id, valueTagId) => j.setStage(id, { valueTagId })}
+              onToggleOnFire={(id) => j.toggleStageOnFire(id)}
+              onManageValueTags={() => setTagManagerOpen(true)}
+              onMove={(id, dir) => j.moveStage(id, dir)}
+              onInsertAfter={(i) => j.addStage(i)}
+              onDelete={(s) => {
+                if (confirm(`Delete stage "${s.title}"?`)) {
+                  if (selectedStageId === s.id) setSelectedStageId(null);
+                  j.deleteStage(s.id);
+                }
+              }}
+            />
           </div>
         </section>
 
