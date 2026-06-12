@@ -26,6 +26,34 @@ import { EditableText } from "./EditableText";
 import { CellEditor } from "./CellEditor";
 import { cn } from "@/lib/utils";
 
+const MONEY_ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
+
+type ValueKind = "capacity" | "revenue" | "cost";
+
+function ValueTag({ value, onFire }: { value: ValueKind; onFire?: boolean }) {
+  const styles: Record<ValueKind, string> = {
+    capacity: "bg-teal-100 text-teal-800 border-teal-200",
+    revenue: "bg-blue-100 text-blue-800 border-blue-200",
+    cost: "bg-amber-100 text-amber-900 border-amber-200",
+  };
+  const labels: Record<ValueKind, string> = {
+    capacity: "Capacity",
+    revenue: "Revenue",
+    cost: "Cost",
+  };
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+        styles[value],
+        onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+      )}
+    >
+      {labels[value]}
+    </span>
+  );
+}
+
 // Parse "😊 Hopeful" → { emoji, label }
 function parseSentiment(text: string) {
   const trimmed = text.trim();
