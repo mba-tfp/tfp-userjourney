@@ -377,10 +377,11 @@ export function JourneyMap() {
 
 type StageCardProps = {
   index: number;
-  stage: { id: string; emoji: string; title: string; subtitle: string };
+  stage: { id: string; emoji: string; title: string; subtitle: string; value?: ValueKind };
   active: boolean;
   dim: boolean;
   sentiment: { emoji: string; label: string };
+  onFire: boolean;
   onSelect: () => void;
   onRename: (patch: Partial<{ emoji: string; title: string; subtitle: string }>) => void;
   onMove: (dir: -1 | 1) => void;
@@ -394,6 +395,7 @@ function StageCard({
   active,
   dim,
   sentiment,
+  onFire,
   onSelect,
   onRename,
   onMove,
