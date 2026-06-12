@@ -1,44 +1,51 @@
-# Answering your questions first
+# Circular Lifecycle Stage Layout
 
-- **"Mark as gap"** isn't a button anymore. The ↔ icon on each line just moves the line between the two cards ("What Exists Today" ↔ "What Doesn't Exist Today"). The card a line lives in *is* its gap status — there's no separate flag. I'll relabel the tooltip to "Move to other card" so this is obvious.
-- **Capacity / Revenue / Cost aren't editable today** because they're hardcoded in `JourneyMap.tsx` (`VALUE_LABELS`, `VALUE_STYLES`). I'll lift them into the same editable registry pattern as tags so you can rename, recolor, add, and delete them.
+Replace the horizontal scrolling stage strip with a closed-loop circle so every stage is visible at once. Click behavior and the existing magazine detail spread stay exactly as they are today.
 
-# What I'll build
+## Layout
 
-## 1. Side-by-side comparison
-Change the magazine spread's right column from `space-y-5` (stacked) to a 2-column grid so "What Exists Today" and "What Doesn't Exist Today" sit beside each other on desktop, stacking on narrow screens. The left feature column (numeral, stage title) stays as-is.
+- New component `StageLifecycle.tsx` renders a single square SVG (responsive, max ~640px) inside the existing `<section>` that currently holds the strip.
+- Stages are evenly distributed around a circle (angle = `i * 2π / n`, starting at 12 o'clock).
+- Between each adjacent pair, draw a thin arc segment with a small arrowhead at the midpoint — the arrows go clockwise around the ring, closing the loop back to stage 1 so it reads as a lifecycle.
+- Each stage is rendered as an absolutely-positioned node (HTML overlay on top of the SVG, using percentage coords) so existing typography, emoji bubble, edit affordances, and the `ValueTag` picker can be reused without re-implementing in SVG.
 
-## 2. Tag legend + counts per card
-Above each card's line list, add a compact legend strip:
-- One pill per tag used by lines *in that card*, colored with the tag's color, suffixed with the count (e.g. `Patient 3`, `Clinic 1`).
-- An "Untagged N" pill when applicable.
-- Hidden when the card has 0 lines.
+## Stage node
 
-## 3. Tag filter chips per card
-The same pills double as filter chips. Click toggles a per-card filter set (independent for Exists vs Doesn't-Exist). Active chips get a solid background; the line list only renders matching lines. A small "Clear" link appears when any filter is active. Filter state is local component state (per stage view) — not persisted.
+Compact circular node (~120px) replacing the 280px card:
+- Top: numeral (`01`, `02`, …) — small, muted; primary color when active.
+- Center: existing 56px emoji bubble (editable via `EditableText`, same as today).
+- Below bubble: stage title (single line, truncated, editable on click-through guard).
+- Tiny `ValueTag` chip under the title.
+- `MoreVertical` menu appears on hover (same dropdown items as today: move left/right, insert after, toggle money on fire, delete) — "left/right" semantics keep working because stages still have an array order.
+- Active state: ring + slight scale-up; inactive when another is selected: dim to 55% (mirrors current `dim` behavior).
+- Money-on-fire ring stays via the existing `ValueTag` wrapper.
 
-## 4. Per-stage money-on-fire
-Today, the global "Money on fire" toggle highlights a fixed set of stage indexes. I'll change it so:
-- Each stage carries `onFire?: boolean` in its data (default seeded from the current `MONEY_ON_FIRE_INDEXES` set so existing visuals don't change).
-- The stage card's dropdown menu (the ⋮) gets a "Toggle money on fire" item.
-- The selected-stage feature column gets a 🔥 toggle button next to the Value tag.
-- The global toolbar button stays, but now just *shows/hides* the highlight (it doesn't decide which stages are on fire).
+Subtitle is dropped from the ring node (no room); it remains visible/editable in the magazine spread below.
 
-## 5. Editable Value tags (Capacity / Revenue / Cost)
-- Introduce `valueTags: ValueTag[]` on the doc (id, name, color) seeded with Capacity (teal), Revenue (blue), Cost (amber).
-- Stage's `value` field becomes a `valueTagId` reference.
-- The `ValueTag` button reads name+color from the registry; the picker dropdown lists registry entries plus "Manage value tags…".
-- Extend the existing `TagManagerDialog` with a second section "Value tags" (same add/rename/recolor/delete UI) — one dialog, two registries.
-- Migration: on load, map existing string values (`"capacity"`/`"revenue"`/`"cost"`) to the corresponding seeded value-tag id.
+## Click behavior
 
-# Files touched
+- Clicking a node toggles `selectedStageId` exactly like today.
+- The magazine spread (`What Exists Today` / `What Doesn't Exist Today`, feature column, ValueTag, money-on-fire button) renders unchanged below the ring.
+- Collapse button in the spread still clears selection.
 
-- `src/lib/journey-data.ts` — add `ValueTag` type, `valueTags` on doc, change `Stage.value` to `valueTagId?: string`, seed value tags, add per-stage `onFire`.
-- `src/lib/journey-store.ts` — migration for string→id and `onFire` seed; CRUD for value tags (`addValueTag`, `renameValueTag`, `setValueTagColor`, `deleteValueTag`); `toggleStageOnFire`.
-- `src/components/journey/JourneyMap.tsx` — side-by-side grid; per-stage on-fire wiring; replace hardcoded `VALUE_STYLES`/`VALUE_LABELS` with registry-driven `ValueTag` component; rename ↔ tooltip.
-- `src/components/journey/LineListCard.tsx` *(new)* — extracted from `JourneyMap.tsx`, owns legend + filter chip state.
-- `src/components/journey/TagManagerDialog.tsx` — add Value-tags section; accept both registries via props.
-- `src/components/journey/LineRow.tsx` — tooltip copy update only.
+## Files
 
-# Out of scope
-Drag-and-drop reordering, cross-stage filtering, persisting filter selections, exporting filter state, changing the underlying "exists/gap" semantics.
+- New: `src/components/journey/StageLifecycle.tsx` — SVG ring + arc connectors + arrowheads + HTML node overlay. Pure presentational; receives `stages`, `selectedStageId`, `valueTags`, `showMoneyOnFire`, and the same callbacks `StageCard` uses today (`onSelect`, `onRename`, `onValueChange`, `onToggleOnFire`, `onManageValueTags`, `onMove`, `onInsertAfter`, `onDelete`).
+- Edit: `src/components/journey/JourneyMap.tsx`
+  - Remove `stripRef`, `scrollStrip`, the two scroll arrow buttons, the `<ol>` strip, and the inline `StageCard` component.
+  - Replace that whole `<section>` body with `<StageLifecycle ... />`.
+  - Keep the "Add stage" toolbar button; add-stage still appends to the array, which simply adds another node to the ring.
+  - Empty-state copy ("Select a stage above…") updated to "Select a stage in the ring to read its details."
+
+No changes to `journey-data.ts`, `journey-store.ts`, `LineRow.tsx`, `LineListCard.tsx`, `TagManagerDialog.tsx`, `TagPicker.tsx`, or persisted data shape.
+
+## Responsiveness
+
+- Ring is `aspect-square` with `width: min(100%, 640px)` and centered.
+- Node size and font shrink slightly at <480px (e.g. 96px nodes) so 8–10 stages still fit without overlap. If stage count exceeds ~12, nodes scale down further proportionally (`nodeSize = clamp(72, ringRadius * sin(π/n) * 1.6, 132)`).
+
+## Out of scope
+
+- Drag-to-reorder around the ring (Move left/right in the menu still works).
+- Animated arc transitions.
+- Changing the detail spread, tags, value tags, or persistence.

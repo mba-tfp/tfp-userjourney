@@ -2,9 +2,7 @@ import { useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
   Plus,
-  Trash2,
   Download,
   Upload,
   RotateCcw,
@@ -12,20 +10,14 @@ import {
   Tag as TagIcon,
   Flame,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useJourney } from "@/lib/journey-store";
 import { EditableText } from "./EditableText";
 import { LineListCard } from "./LineListCard";
+import { StageLifecycle } from "./StageLifecycle";
 import { TagManagerDialog } from "./TagManagerDialog";
 import { TagPicker } from "./TagPicker";
-import type { Stage, Tag } from "@/lib/journey-data";
+import type { Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
 
 function ValueTag({
@@ -63,7 +55,6 @@ function ValueTag({
 export function JourneyMap() {
   const j = useJourney();
   const fileRef = useRef<HTMLInputElement>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
@@ -95,10 +86,6 @@ export function JourneyMap() {
     } finally {
       e.target.value = "";
     }
-  };
-
-  const scrollStrip = (dir: -1 | 1) => {
-    stripRef.current?.scrollBy({ left: dir * 360, behavior: "smooth" });
   };
 
   const tool = (icon: React.ReactNode, label: string, onClick: () => void) => (
@@ -166,67 +153,30 @@ export function JourneyMap() {
         </header>
 
         {/* Stage strip */}
+        {/* Stage lifecycle ring */}
         <section className="relative">
-          <div className="mx-auto max-w-[1400px] px-2 sm:px-4">
-            <div className="group/strip relative">
-              <button
-                onClick={() => scrollStrip(-1)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover/strip:opacity-100 transition hover:bg-secondary"
-                aria-label="Scroll left"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => scrollStrip(1)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover/strip:opacity-100 transition hover:bg-secondary"
-                aria-label="Scroll right"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-              <div
-                ref={stripRef}
-                className="overflow-x-auto edge-fade-x snap-x snap-mandatory scroll-px-8 pt-8 pb-10 px-6"
-                style={{ scrollbarWidth: "thin" }}
-              >
-                <ol className="flex gap-4 items-stretch">
-                  {j.doc.stages.map((s, i) => {
-                    const active = s.id === selectedStageId;
-                    const dim = selectedStageId && !active;
-                    const onFire = showMoneyOnFire && !!s.onFire;
-                    return (
-                      <li
-                        key={s.id}
-                        className="snap-start"
-                      >
-                        <StageCard
-                          index={i}
-                          stage={s}
-                          active={active}
-                          dim={!!dim}
-                          onFire={onFire}
-                          valueTags={j.doc.valueTags}
-                          onSelect={() =>
-                            setSelectedStageId((cur) => (cur === s.id ? null : s.id))
-                          }
-                          onRename={(patch) => j.setStage(s.id, patch)}
-                          onValueChange={(valueTagId) => j.setStage(s.id, { valueTagId })}
-                          onToggleOnFire={() => j.toggleStageOnFire(s.id)}
-                          onManageValueTags={() => setTagManagerOpen(true)}
-                          onMove={(dir) => j.moveStage(s.id, dir)}
-                          onInsertAfter={() => j.addStage(i)}
-                          onDelete={() => {
-                            if (confirm(`Delete stage "${s.title}"?`)) {
-                              if (selectedStageId === s.id) setSelectedStageId(null);
-                              j.deleteStage(s.id);
-                            }
-                          }}
-                        />
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-            </div>
+          <div className="mx-auto max-w-[1400px] px-6 pt-8 pb-10">
+            <StageLifecycle
+              stages={j.doc.stages}
+              valueTags={j.doc.valueTags}
+              selectedStageId={selectedStageId}
+              showMoneyOnFire={showMoneyOnFire}
+              onSelect={(id) =>
+                setSelectedStageId((cur) => (cur === id ? null : id))
+              }
+              onRename={(id, patch) => j.setStage(id, patch)}
+              onValueChange={(id, valueTagId) => j.setStage(id, { valueTagId })}
+              onToggleOnFire={(id) => j.toggleStageOnFire(id)}
+              onManageValueTags={() => setTagManagerOpen(true)}
+              onMove={(id, dir) => j.moveStage(id, dir)}
+              onInsertAfter={(i) => j.addStage(i)}
+              onDelete={(s) => {
+                if (confirm(`Delete stage "${s.title}"?`)) {
+                  if (selectedStageId === s.id) setSelectedStageId(null);
+                  j.deleteStage(s.id);
+                }
+              }}
+            />
           </div>
         </section>
 
@@ -357,141 +307,5 @@ export function JourneyMap() {
         onDeleteValueTag={j.deleteValueTag}
       />
     </TooltipProvider>
-  );
-}
-
-type StageCardProps = {
-  index: number;
-  stage: Stage;
-  valueTags: Tag[];
-  active: boolean;
-  dim: boolean;
-  onFire: boolean;
-  onSelect: () => void;
-  onRename: (patch: Partial<{ emoji: string; title: string; subtitle: string }>) => void;
-  onValueChange: (valueTagId: string | undefined) => void;
-  onToggleOnFire: () => void;
-  onManageValueTags: () => void;
-  onMove: (dir: -1 | 1) => void;
-  onInsertAfter: () => void;
-  onDelete: () => void;
-};
-
-function StageCard({
-  index,
-  stage,
-  valueTags,
-  active,
-  dim,
-  onFire,
-  onSelect,
-  onRename,
-  onValueChange,
-  onToggleOnFire,
-  onManageValueTags,
-  onMove,
-  onInsertAfter,
-  onDelete,
-}: StageCardProps) {
-  return (
-    <div
-      role="button"
-      onClick={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest("input, textarea, [data-no-toggle]")) return;
-        onSelect();
-      }}
-      className={cn(
-        "group/card relative h-full w-[280px] cursor-pointer rounded-2xl border bg-card p-5 transition-all duration-200",
-        active
-          ? "border-primary/40 -translate-y-1"
-          : "border-border hover:-translate-y-0.5 hover:border-foreground/15",
-        dim && "opacity-55",
-      )}
-      style={{ boxShadow: active ? "var(--shadow-card)" : undefined }}
-    >
-      {/* Top: numeral + menu */}
-      <div className="flex items-start justify-between">
-        <span
-          className={cn(
-            "font-display text-3xl font-semibold tracking-tight",
-            active ? "text-primary" : "text-muted-foreground/70",
-          )}
-        >
-          {String(index + 1).padStart(2, "0")}
-        </span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              data-no-toggle
-              onClick={(e) => e.stopPropagation()}
-              className="opacity-0 group-hover/card:opacity-100 text-muted-foreground hover:text-foreground transition"
-              aria-label="Stage options"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onMove(-1)}>
-              <ChevronLeft className="h-4 w-4 mr-2" /> Move left
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onMove(1)}>
-              <ChevronRight className="h-4 w-4 mr-2" /> Move right
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onInsertAfter}>
-              <Plus className="h-4 w-4 mr-2" /> Insert after
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onToggleOnFire}>
-              <Flame className="h-4 w-4 mr-2" />
-              {stage.onFire ? "Unmark money on fire" : "Mark money on fire"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Glyph */}
-      <div className="mt-4 h-14 w-14 rounded-full bg-secondary border border-border flex items-center justify-center text-2xl">
-        <EditableText
-          value={stage.emoji}
-          onChange={(emoji) => onRename({ emoji })}
-          className="leading-none"
-        />
-      </div>
-
-      {/* Title + subtitle */}
-      <div className="mt-4">
-        <EditableText
-          value={stage.title}
-          onChange={(title) => onRename({ title })}
-          className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground"
-        />
-        <div className="mt-2">
-          <ValueTag
-            valueTagId={stage.valueTagId}
-            valueTags={valueTags}
-            onFire={onFire}
-            onChange={onValueChange}
-            onManage={onManageValueTags}
-          />
-        </div>
-        <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground line-clamp-3">
-          <EditableText
-            multiline
-            value={stage.subtitle}
-            onChange={(subtitle) => onRename({ subtitle })}
-          />
-        </div>
-      </div>
-
-      {/* Active accent bar */}
-      {active && (
-        <span className="absolute left-5 right-5 -bottom-px h-0.5 rounded-full bg-primary" />
-      )}
-    </div>
   );
 }
