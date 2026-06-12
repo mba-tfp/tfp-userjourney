@@ -43,7 +43,10 @@ function migrateV1(legacy: any): JourneyDoc {
     emoji: s.emoji,
     title: s.title,
     subtitle: s.subtitle,
-    value: s.value ?? seedDoc.stages[i]?.value,
+    valueTagId:
+      (s?.value && VALUE_TAG_IDS[s.value as keyof typeof VALUE_TAG_IDS]) ||
+      seedDoc.stages[i]?.valueTagId,
+    onFire: seedDoc.stages[i]?.onFire ?? false,
   }));
 
   const lines: Record<string, Line[]> = {};
