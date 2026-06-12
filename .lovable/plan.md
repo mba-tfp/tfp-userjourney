@@ -1,28 +1,71 @@
 ## Goal
-Add a single colored "Value" tag (Capacity / Revenue / Cost) under each stage name, plus a top-bar toggle that highlights money-losing stages with a red outline. Lens rows (Patient, Clinic, TFP, Channel, etc.) stay exactly as they are.
+Replace the 5 lens cards per stage with two cards — "What Exists Today" and "What Doesn't Exist Today" — where each line carries a colored tag (Patient, Clinic, TFP, Channel, What Exists Today). The tag list is editable globally. Each line has an explicit exists/doesn't-exist toggle that decides which card it appears in.
 
-## Changes
+## Data model
 
-### 1. `src/lib/journey-data.ts`
-- Extend `Stage` type with `value: "capacity" | "revenue" | "cost"`.
-- Add the same field to `stageDefs` with this mapping (stages are 1-indexed):
-  - 1 Capacity, 2 Revenue, 3 Cost, 4 Capacity, 5 Cost, 6 Revenue, 7 Capacity, 8 Capacity, 9 Revenue, 10 Revenue, 11 Revenue.
+`CellLine` becomes line-level with its own metadata, and lines live in a single per-stage pool rather than per-lens cells.
 
-### 2. `src/components/journey/JourneyMap.tsx`
-- Add `showMoneyOnFire` state (default `false`) and a `MONEY_ON_FIRE_INDEXES = new Set([2,5,8,9,10])` (0-based for stages 3, 6, 9, 10, 11).
-- In the masthead toolbar, add a labeled toggle (small pill button with Flame icon + "Money on fire" label, active state = filled accent). Keep tooltip; visually distinct from the icon-only tools.
-- New `ValueTag` component: small pill (`text-[10px] uppercase tracking-wide`, rounded-full, px-2 py-0.5) with color variants:
-  - capacity → teal (`bg-teal-100 text-teal-800 border-teal-200` style via inline classes, or token equivalents)
-  - revenue → blue (`bg-blue-100 text-blue-800 border-blue-200`)
-  - cost → amber (`bg-amber-100 text-amber-900 border-amber-200`)
-  - When `onFire` prop true → add `ring-2 ring-destructive ring-offset-1` red outline.
-- Pass `value` and `onFire` to `StageCard`. Render the tag inside the card directly under the title (before the subtitle).
-- Also render the tag in the magazine spread's feature column next to the sentiment pill, so the value is visible while expanded.
+```ts
+type Tag = { id: string; name: string; color: string };
+type Line = { id: string; text: string; tagId?: string; exists: boolean };
+type Stage = { id; emoji; title; subtitle; value? };
+type JourneyDoc = {
+  title: string;
+  stages: Stage[];
+  tags: Tag[];                  // editable, replaces lenses
+  lines: Record<string, Line[]>; // lines[stageId] = ordered Line[]
+};
+```
 
-### 3. No changes
-- `CellEditor`, `EditableText`, `journey-store`, lens rows, persisted JSON migration handled by spreading defaults — existing localStorage docs missing `value` will simply render no tag until reset; acceptable per scope (mention in closing message).
+Seed `tags` from the current lens names (What Exists Today, Patient, Clinic, TFP, Channel) with the existing palette. Migrate every existing cell line into `lines[stageId]`, set `tagId` to the lens it came from, and set `exists = !line.gap` (so today's red "✗ No …" lines auto-land in "What Doesn't Exist").
+
+Persisted docs in localStorage are migrated on load (one-shot v1 → v2 migration keyed on doc shape).
+
+## UI
+
+**Magazine spread (expanded stage)** — replace the bento grid with two stacked cards:
+
+```text
+┌─ What Exists Today ──────────────┐
+│ • [Patient] No digital resource… │
+│ • [TFP]     52% of market…       │
+│ + Add line                       │
+└──────────────────────────────────┘
+┌─ What Doesn't Exist Today ───────┐
+│ • [Clinic]  No REI waitlist…     │
+│ • [Channel] No HCP co-marketing… │
+│ + Add line                       │
+└──────────────────────────────────┘
+```
+
+Each line shows:
+- Tag pill on the left — click to open a picker (existing tags + "Manage tags…").
+- Editable text (existing `EditableText`).
+- Hover tray: toggle exists/doesn't-exist (moves the line between cards), delete.
+
+"+ Add line" inside each card creates a line pre-set to that card's exists value, tag empty.
+
+**Tag manager** — a small dialog (or popover from any tag picker) to rename, add, delete, recolor tags. Used by tag pickers across all stages.
+
+**Stage card (collapsed)** — keep as-is; the sentiment area is already gone. No tag chips here to keep the strip uncluttered.
+
+## Components
+
+- `src/lib/journey-data.ts` — new types, seed tags, seed `lines` derived from existing rows.
+- `src/lib/journey-store.ts` — replace `setCell` with line CRUD (`addLine`, `updateLine`, `deleteLine`, `moveLine`, `setLineExists`, `setLineTag`); add tag CRUD (`addTag`, `renameTag`, `setTagColor`, `deleteTag`). Add migration in `load()` for v1 docs.
+- `src/components/journey/JourneyMap.tsx` — swap the lens bento for two `LineList` cards.
+- `src/components/journey/LineList.tsx` (new) — renders one card (title, lines, add button).
+- `src/components/journey/LineRow.tsx` (new) — tag pill + editable text + hover tray.
+- `src/components/journey/TagPicker.tsx` (new) — dropdown listing tags with color swatches and "Manage tags…".
+- `src/components/journey/TagManagerDialog.tsx` (new) — add/rename/recolor/delete tags.
+- `CellEditor.tsx` — retired (delete) once the new components are in place.
 
 ## Out of scope
-- Editing the value per stage from the UI.
-- Persisting the money-on-fire toggle.
-- Changing lens content.
+- Drag-to-reorder lines (use up/down in hover tray instead).
+- Per-tag filtering on the spread.
+- Bulk re-tagging.
+- Changes to the stage strip, masthead, or money-on-fire toggle.
+
+## Notes
+- Existing `gap`-flagged lines automatically migrate to "What Doesn't Exist"; everything else lands in "What Exists Today". You can flip any line afterward with the toggle.
+- Tag colors reuse the existing token palette so the redesign stays on-theme.
