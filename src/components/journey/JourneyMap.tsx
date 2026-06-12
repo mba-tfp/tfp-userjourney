@@ -475,45 +475,84 @@ function StageCard({
   );
 }
 
-function Row({ j, lensId }: { j: ReturnType<typeof useJourney>; lensId: string }) {
-  const lens = j.doc.lenses.find((l) => l.id === lensId)!;
+type LineListCardProps = {
+  title: string;
+  subtitle?: string;
+  accent?: "default" | "destructive";
+  lines: import("@/lib/journey-data").Line[];
+  tags: import("@/lib/journey-data").Tag[];
+  onAddLine: () => void;
+  onUpdateLine: (id: string, patch: Partial<import("@/lib/journey-data").Line>) => void;
+  onDeleteLine: (id: string) => void;
+  onMoveLine: (id: string, dir: -1 | 1) => void;
+  onManageTags: () => void;
+};
+
+function LineListCard({
+  title,
+  subtitle,
+  accent = "default",
+  lines,
+  tags,
+  onAddLine,
+  onUpdateLine,
+  onDeleteLine,
+  onMoveLine,
+  onManageTags,
+}: LineListCardProps) {
+  const isGap = accent === "destructive";
   return (
-    <>
-      <div className="sticky left-0 z-10 bg-background border-b border-r p-3 group/lens flex items-start justify-between gap-1">
-        <EditableText
-          value={lens.name}
-          onChange={(name) => j.setLens(lens.id, name)}
-          className="text-sm font-semibold uppercase tracking-wide text-foreground"
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="opacity-0 group-hover/lens:opacity-100 text-muted-foreground">
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => j.moveLens(lens.id, -1)}>Move up</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => j.moveLens(lens.id, 1)}>Move down</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => {
-                if (confirm(`Delete lens "${lens.name}"?`)) j.deleteLens(lens.id);
-              }}
-            >
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+    <article
+      className={cn(
+        "rounded-2xl border bg-card p-6 transition-shadow",
+        isGap ? "border-destructive/25" : "border-border",
+      )}
+      style={{ boxShadow: "var(--shadow-card)" }}
+    >
+      <header className="mb-4 flex items-baseline justify-between gap-3">
+        <div>
+          <h3
+            className={cn(
+              "font-display text-lg font-semibold tracking-tight",
+              isGap ? "text-destructive" : "text-foreground",
+            )}
+          >
+            {title}
+          </h3>
+          {subtitle && (
+            <p className="mt-0.5 text-[12px] text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          {lines.length}
+        </span>
+      </header>
+      <div className="space-y-2">
+        {lines.map((line) => (
+          <LineRow
+            key={line.id}
+            line={line}
+            tags={tags}
+            isGap={isGap}
+            onChange={(patch) => onUpdateLine(line.id, patch)}
+            onDelete={() => onDeleteLine(line.id)}
+            onMove={(dir) => onMoveLine(line.id, dir)}
+            onToggleExists={() => onUpdateLine(line.id, { exists: !line.exists })}
+            onManageTags={onManageTags}
+          />
+        ))}
+        {lines.length === 0 && (
+          <p className="text-[12.5px] italic text-muted-foreground py-2">
+            Nothing here yet.
+          </p>
+        )}
       </div>
-      {j.doc.stages.map((s) => {
-        const cell = j.doc.cells[lens.id]?.[s.id] ?? { lines: [{ text: "" }] };
-        return (
-          <div key={s.id} className="border-b border-r p-3 align-top">
-            <CellEditor cell={cell} onChange={(c) => j.setCell(lens.id, s.id, c)} />
-          </div>
-        );
-      })}
-    </>
+      <button
+        onClick={onAddLine}
+        className="mt-3 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition"
+      >
+        <Plus className="h-3 w-3" /> Add line
+      </button>
+    </article>
   );
 }
