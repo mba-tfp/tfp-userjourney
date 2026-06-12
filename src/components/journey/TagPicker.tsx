@@ -15,9 +15,11 @@ type Props = {
   value?: string;
   onChange: (tagId: string | undefined) => void;
   onManage: () => void;
+  placeholder?: string;
+  manageLabel?: string;
 };
 
-export function TagPicker({ tags, value, onChange, onManage }: Props) {
+export function TagPicker({ tags, value, onChange, onManage, placeholder = "Tag", manageLabel = "Manage tags…" }: Props) {
   const tag = tags.find((t) => t.id === value);
   return (
     <DropdownMenu>
@@ -32,7 +34,7 @@ export function TagPicker({ tags, value, onChange, onManage }: Props) {
               : "border-dashed border-border bg-transparent text-muted-foreground hover:bg-secondary",
           )}
         >
-          {tag ? tag.name : "Tag"}
+          {tag ? tag.name : placeholder}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
@@ -52,7 +54,7 @@ export function TagPicker({ tags, value, onChange, onManage }: Props) {
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onManage}>
-          <Settings2 className="h-3.5 w-3.5 mr-2" /> Manage tags…
+          <Settings2 className="h-3.5 w-3.5 mr-2" /> {manageLabel}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

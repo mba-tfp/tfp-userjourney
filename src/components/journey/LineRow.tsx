@@ -51,7 +51,7 @@ export function LineRow({
       />
       <div className="absolute right-1.5 top-1.5 flex items-center gap-0.5 opacity-0 group-hover/line:opacity-100 transition">
         <button
-          title={isGap ? "Move to 'Exists today'" : "Move to 'Doesn't exist'"}
+          title={isGap ? "Move to 'What Exists Today'" : "Move to 'What Doesn't Exist Today'"}
           onClick={onToggleExists}
           className="rounded p-1 text-muted-foreground hover:bg-background/80 hover:text-foreground"
         >

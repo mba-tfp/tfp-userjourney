@@ -12,13 +12,15 @@ export type Stage = {
   emoji: string;
   title: string;
   subtitle: string;
-  value?: "capacity" | "revenue" | "cost";
+  valueTagId?: string;
+  onFire?: boolean;
 };
 
 export type JourneyDoc = {
   title: string;
   stages: Stage[];
   tags: Tag[];
+  valueTags: Tag[];
   lines: Record<string, Line[]>; // lines[stageId] = ordered Line[]
 };
 
@@ -27,7 +29,26 @@ const uid = (p: string, i: number) => `${p}-${i}`;
 export const newId = (p: string) =>
   `${p}-${Math.random().toString(36).slice(2, 8)}`;
 
-const stageDefs: Omit<Stage, "id">[] = [
+// Value tags (editable registry; seeded with the original Capacity/Revenue/Cost set)
+export const VALUE_TAG_IDS = {
+  capacity: "vt-capacity",
+  revenue: "vt-revenue",
+  cost: "vt-cost",
+} as const;
+
+const valueTagSeed: Tag[] = [
+  { id: VALUE_TAG_IDS.capacity, name: "Capacity", color: "teal" },
+  { id: VALUE_TAG_IDS.revenue, name: "Revenue", color: "blue" },
+  { id: VALUE_TAG_IDS.cost, name: "Cost", color: "amber" },
+];
+
+// Original indexes (0-based) that were flagged "money on fire"
+const ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
+
+type StageSeed = Omit<Stage, "id" | "valueTagId" | "onFire"> & {
+  value: keyof typeof VALUE_TAG_IDS;
+};
+const stageDefs: StageSeed[] = [
   { emoji: "🔍", title: "Awareness & Discovery", subtitle: "Pre-referral, website, GP search", value: "capacity" },
   { emoji: "🤔", title: "Consideration & Comparison", subtitle: "Evaluating TFP vs. competitors", value: "revenue" },
   { emoji: "📇", title: "Referral & Conversion", subtitle: "HCP sends referral; patient first contacted", value: "cost" },
@@ -41,7 +62,12 @@ const stageDefs: Omit<Stage, "id">[] = [
   { emoji: "♻️", title: "Continuity of Care", subtitle: "Cryo storage, re-entry, long-term support", value: "revenue" },
 ];
 
-const stages: Stage[] = stageDefs.map((s, i) => ({ ...s, id: uid("s", i + 1) }));
+const stages: Stage[] = stageDefs.map(({ value, ...rest }, i) => ({
+  ...rest,
+  id: uid("s", i + 1),
+  valueTagId: VALUE_TAG_IDS[value],
+  onFire: ON_FIRE_INDEXES.has(i),
+}));
 
 // Tag palette (semantic-ish; works in light theme)
 export const TAG_COLORS = [
@@ -204,5 +230,6 @@ export const seedDoc: JourneyDoc = {
   title: "otto Journey Map",
   stages,
   tags,
+  valueTags: valueTagSeed,
   lines,
 };
