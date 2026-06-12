@@ -474,6 +474,11 @@ function StageCard({
           onChange={(title) => onRename({ title })}
           className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground"
         />
+        {stage.value && (
+          <div className="mt-2">
+            <ValueTag value={stage.value} onFire={onFire} />
+          </div>
+        )}
         <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground line-clamp-3">
           <EditableText
             multiline
