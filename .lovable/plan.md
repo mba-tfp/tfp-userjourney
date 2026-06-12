@@ -1,36 +1,38 @@
-## Otto Multi-lenses Journey — Interactive Editable Map
+## Redesign — Editorial Cloud White
 
-Build a web app that renders the journey grid from the screenshot and lets you edit every cell, add/remove stages and lenses, and persist changes.
+Locked tokens: Cloud White palette `#fafbfc / #e8ecf1 / #94a3b8 / #3b82f6`, Space Grotesk (display) + DM Sans (body), Magazine layout.
 
-### Layout
-- Header: editable title ("otto Multi-lenses Journey") + Fertility Partners logo placeholder.
-- Grid: rows = lenses (Stage, Sentiment, What Exists Today, Patient, Clinic, TFP, Channel), columns = 11 stages (Stage 1–11). Sticky first column with row labels; horizontal scroll for stages.
-- Each stage column header shows: "Stage N", emoji/icon, title, short subtitle.
-- Each cell is click-to-edit (inline textarea). Sentiment row has emoji + label. "What Exists Today" supports checkmark (✓) / cross (✗) lines with red highlight for gaps.
+### Tokens & fonts
+- `src/routes/__root.tsx` — add Google Fonts `<link>` for Space Grotesk + DM Sans.
+- `src/styles.css` — rewrite `:root` to Cloud White in oklch, register `--font-display` and `--font-sans` in `@theme`, set body to DM Sans, headings/numerals to Space Grotesk. Add `--shadow-card` and a `.dot-bg` utility (faint dot pattern for the page background).
 
-### Editing
-- Click any text to edit inline; blur or Enter to save.
-- Per-stage controls: rename, change emoji, delete stage, insert stage left/right, reorder (drag handle).
-- Per-row (lens) controls: rename lens, add lens, delete lens, reorder.
-- Cell formatting: support multi-line; toggle a "gap" flag that renders the text red (matches the red X items in the source).
-- Toolbar: Add Stage, Add Lens, Reset to default, Export JSON, Import JSON.
+### Header (masthead)
+- Sticky, generous vertical space. Thin uppercase eyebrow ("The Fertility Partners · Patient Journey"), oversized editable title in Space Grotesk with tight tracking.
+- Toolbar collapses to icon-only ghost buttons with tooltips (Add Lens, Add Stage, Export, Import, Reset).
 
-### Persistence
-- Store the whole document in `localStorage` (single-user, no backend). Auto-save on every change.
-- Seed with the exact content from the uploaded screenshot so it opens looking like the source.
+### Stage strip
+- Horizontal scroll-snap row of stage cards. Each card: large display numeral "01"–"11" in Space Grotesk, circular monochrome glyph for the emoji, stage title, one-line subtitle, sentiment pill (emoji + label) at bottom.
+- Inactive cards: hairline border, off-white surface, soft hover lift. Active card: accent blue underline + lifted shadow, others dim to 70%.
+- Edge fade masks on left/right; left/right chevron buttons appear on hover.
 
-### Tech / Files
-- Single TanStack route `/` renders the editor.
-- `src/lib/journey-data.ts` — TypeScript types + seed data transcribed from the image.
-- `src/lib/journey-store.ts` — small zustand-style hook over `useState` + localStorage (no new deps; plain React).
-- `src/components/journey/JourneyMap.tsx` — grid renderer.
-- `src/components/journey/EditableText.tsx` — click-to-edit primitive.
-- `src/components/journey/StageHeader.tsx`, `CellEditor.tsx`, `Toolbar.tsx`.
-- Use existing shadcn `button`, `input`, `textarea`, `dropdown-menu`, `dialog` for controls. Drag-reorder via simple HTML5 drag handlers (no new library).
+### Expanded magazine spread
+- When a stage is selected, a full-width band unfurls below with a subtle dot background.
+- Left feature column (~⅓): huge "Stage 07" eyebrow + numeral, title in display type, subtitle, sentiment pill, quiet Collapse link.
+- Right column (~⅔): 2-col bento of lens cards. Lens card = small uppercase eyebrow, hairline border, generous padding, lines rendered as chip rows with a small dot. Gap lines become a soft red-tinted pill with an alert icon — never raw red body text.
 
-### Out of scope (unless asked)
-- Multi-user sync / Lovable Cloud backend.
-- Rich text, images per cell, comments/history, PDF export.
-- Auth.
+### Micro-interactions
+- `EditableText`: hover shows a thin dotted underline; focus state uses a soft ring. No bg fill on hover.
+- `CellEditor`: per-line controls live in a faint right-side tray that fades in on hover. Add-line is a discreet "+ Add" link below the list.
+- Transitions ≤200ms ease-out for expand/collapse and active stage.
 
-Want me to add any of the out-of-scope items (e.g. Cloud-backed sharing, export to PDF/PNG) before I build?
+### Files
+- `src/styles.css`
+- `src/routes/__root.tsx`
+- `src/components/journey/JourneyMap.tsx`
+- `src/components/journey/CellEditor.tsx`
+- `src/components/journey/EditableText.tsx`
+
+### Out of scope
+- Data model, editing flows, persistence.
+- Dark mode visual tuning.
+- New libraries (no Motion, no Magic UI).
