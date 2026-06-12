@@ -30,38 +30,53 @@ const MONEY_ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
 
 type ValueKind = "capacity" | "revenue" | "cost";
 
-function ValueTag({ value, onFire }: { value: ValueKind; onFire?: boolean }) {
-  const styles: Record<ValueKind, string> = {
-    capacity: "bg-teal-100 text-teal-800 border-teal-200",
-    revenue: "bg-blue-100 text-blue-800 border-blue-200",
-    cost: "bg-amber-100 text-amber-900 border-amber-200",
-  };
-  const labels: Record<ValueKind, string> = {
-    capacity: "Capacity",
-    revenue: "Revenue",
-    cost: "Cost",
-  };
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        styles[value],
-        onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
-      )}
-    >
-      {labels[value]}
-    </span>
-  );
-}
+const VALUE_STYLES: Record<ValueKind, string> = {
+  capacity: "bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200",
+  revenue: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200",
+  cost: "bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200",
+};
+const VALUE_LABELS: Record<ValueKind, string> = {
+  capacity: "Capacity",
+  revenue: "Revenue",
+  cost: "Cost",
+};
 
-// Parse "😊 Hopeful" → { emoji, label }
-function parseSentiment(text: string) {
-  const trimmed = text.trim();
-  if (!trimmed) return { emoji: "", label: "" };
-  // Match leading emoji (any non-letter/number run at start)
-  const m = trimmed.match(/^(\S+)\s+(.*)$/);
-  if (m && /\p{Extended_Pictographic}/u.test(m[1])) return { emoji: m[1], label: m[2] };
-  return { emoji: "", label: trimmed };
+function ValueTag({
+  value,
+  onFire,
+  onChange,
+}: {
+  value?: ValueKind;
+  onFire?: boolean;
+  onChange: (next: ValueKind) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          data-no-toggle
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition",
+            value
+              ? VALUE_STYLES[value]
+              : "border-dashed border-border bg-transparent text-muted-foreground hover:bg-secondary",
+            onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+          )}
+        >
+          {value ? VALUE_LABELS[value] : "Set value"}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+        {(Object.keys(VALUE_LABELS) as ValueKind[]).map((k) => (
+          <DropdownMenuItem key={k} onClick={() => onChange(k)}>
+            <span className={cn("mr-2 h-2.5 w-2.5 rounded-full border", VALUE_STYLES[k])} />
+            {VALUE_LABELS[k]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function JourneyMap() {
@@ -71,14 +86,9 @@ export function JourneyMap() {
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
 
-  const sentimentLens =
-    j.doc.lenses.find((l) => l.name.toLowerCase() === "sentiment") ?? j.doc.lenses[0];
-  const detailLenses = j.doc.lenses.filter((l) => l.id !== sentimentLens?.id);
+  const detailLenses = j.doc.lenses;
   const selectedStage = j.doc.stages.find((s) => s.id === selectedStageId) ?? null;
   const selectedIndex = selectedStage ? j.doc.stages.indexOf(selectedStage) : -1;
-  const selectedSentiment = selectedStage && sentimentLens
-    ? parseSentiment(j.doc.cells[sentimentLens.id]?.[selectedStage.id]?.lines[0]?.text ?? "")
-    : null;
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(j.doc, null, 2)], { type: "application/json" });
@@ -196,9 +206,6 @@ export function JourneyMap() {
               >
                 <ol className="flex gap-4 items-stretch">
                   {j.doc.stages.map((s, i) => {
-                    const sentimentText =
-                      sentimentLens && j.doc.cells[sentimentLens.id]?.[s.id]?.lines[0]?.text;
-                    const sentiment = parseSentiment(sentimentText ?? "");
                     const active = s.id === selectedStageId;
                     const dim = selectedStageId && !active;
                     const onFire = showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(i);
@@ -212,12 +219,12 @@ export function JourneyMap() {
                           stage={s}
                           active={active}
                           dim={!!dim}
-                          sentiment={sentiment}
                           onFire={onFire}
                           onSelect={() =>
                             setSelectedStageId((cur) => (cur === s.id ? null : s.id))
                           }
                           onRename={(patch) => j.setStage(s.id, patch)}
+                          onValueChange={(value) => j.setStage(s.id, { value })}
                           onMove={(dir) => j.moveStage(s.id, dir)}
                           onInsertAfter={() => j.addStage(i)}
                           onDelete={() => {
@@ -261,18 +268,11 @@ export function JourneyMap() {
                     <div className="h-12 w-12 rounded-full bg-secondary border border-border flex items-center justify-center text-2xl">
                       {selectedStage.emoji}
                     </div>
-                    {selectedSentiment && (selectedSentiment.emoji || selectedSentiment.label) && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
-                        <span className="text-sm">{selectedSentiment.emoji}</span>
-                        {selectedSentiment.label}
-                      </span>
-                    )}
-                    {selectedStage.value && (
-                      <ValueTag
-                        value={selectedStage.value}
-                        onFire={showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(selectedIndex)}
-                      />
-                    )}
+                    <ValueTag
+                      value={selectedStage.value}
+                      onFire={showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(selectedIndex)}
+                      onChange={(value) => j.setStage(selectedStage.id, { value })}
+                    />
                   </div>
                   <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight">
                     <EditableText
@@ -380,10 +380,10 @@ type StageCardProps = {
   stage: { id: string; emoji: string; title: string; subtitle: string; value?: ValueKind };
   active: boolean;
   dim: boolean;
-  sentiment: { emoji: string; label: string };
   onFire: boolean;
   onSelect: () => void;
   onRename: (patch: Partial<{ emoji: string; title: string; subtitle: string }>) => void;
+  onValueChange: (value: ValueKind) => void;
   onMove: (dir: -1 | 1) => void;
   onInsertAfter: () => void;
   onDelete: () => void;
@@ -394,10 +394,10 @@ function StageCard({
   stage,
   active,
   dim,
-  sentiment,
   onFire,
   onSelect,
   onRename,
+  onValueChange,
   onMove,
   onInsertAfter,
   onDelete,
@@ -474,11 +474,9 @@ function StageCard({
           onChange={(title) => onRename({ title })}
           className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground"
         />
-        {stage.value && (
-          <div className="mt-2">
-            <ValueTag value={stage.value} onFire={onFire} />
-          </div>
-        )}
+        <div className="mt-2">
+          <ValueTag value={stage.value} onFire={onFire} onChange={onValueChange} />
+        </div>
         <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground line-clamp-3">
           <EditableText
             multiline
@@ -486,25 +484,6 @@ function StageCard({
             onChange={(subtitle) => onRename({ subtitle })}
           />
         </div>
-      </div>
-
-      {/* Sentiment pill */}
-      <div className="mt-5 pt-4 border-t border-border/70">
-        {sentiment.emoji || sentiment.label ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-medium",
-              active ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground/80",
-            )}
-          >
-            <span className="text-sm leading-none">{sentiment.emoji}</span>
-            {sentiment.label}
-          </span>
-        ) : (
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
-            No sentiment
-          </span>
-        )}
       </div>
 
       {/* Active accent bar */}

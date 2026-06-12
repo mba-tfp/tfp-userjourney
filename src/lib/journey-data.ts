@@ -35,7 +35,6 @@ const stageDefs: Omit<Stage, "id">[] = [
 const stages: Stage[] = stageDefs.map((s, i) => ({ ...s, id: uid("s", i + 1) }));
 
 const lensDefs = [
-  "Sentiment",
   "What Exists Today",
   "Patient",
   "Clinic",
@@ -44,22 +43,8 @@ const lensDefs = [
 ];
 const lenses: Lens[] = lensDefs.map((n, i) => ({ id: uid("l", i + 1), name: n }));
 
-// 6 lenses x 11 stages cell content. Each entry is array of lines; gap=true → red.
+// 5 lenses x 11 stages cell content. Each entry is array of lines; gap=true → red.
 const rows: CellLine[][][] = [
-  // Sentiment
-  [
-    [{ text: "😊 Hopeful" }],
-    [{ text: "🤨 Evaluating" }],
-    [{ text: "😿 Frustrated" }],
-    [{ text: "😰 Overwhelmed" }],
-    [{ text: "🙏 Uncertain" }],
-    [{ text: "😌 Reassured" }],
-    [{ text: "😟 Hopeful/Anxious" }],
-    [{ text: "😀 Committed" }],
-    [{ text: "😖 Most Vulnerable" }],
-    [{ text: "❤️ Relief / Grief" }],
-    [{ text: "🔁 Navigating Next" }],
-  ],
   // What Exists Today
   [
     [{ text: "Clinic website" }, { text: "Blog & social" }, { text: "Paid ads" }],
