@@ -8,7 +8,13 @@ function load(): JourneyDoc {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return seedDoc;
-    return JSON.parse(raw) as JourneyDoc;
+    const parsed = JSON.parse(raw) as JourneyDoc;
+    // Backfill stage.value from seed (by index) for docs saved before this field existed
+    parsed.stages = parsed.stages.map((s, i) => ({
+      ...s,
+      value: s.value ?? seedDoc.stages[i]?.value,
+    }));
+    return parsed;
   } catch {
     return seedDoc;
   }
