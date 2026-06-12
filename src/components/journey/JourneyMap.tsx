@@ -22,60 +22,41 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useJourney } from "@/lib/journey-store";
 import { EditableText } from "./EditableText";
-import { LineRow } from "./LineRow";
+import { LineListCard } from "./LineListCard";
 import { TagManagerDialog } from "./TagManagerDialog";
+import { TagPicker } from "./TagPicker";
+import type { Stage, Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
 
-const MONEY_ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
-
-type ValueKind = "capacity" | "revenue" | "cost";
-
-const VALUE_STYLES: Record<ValueKind, string> = {
-  capacity: "bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200",
-  revenue: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200",
-  cost: "bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200",
-};
-const VALUE_LABELS: Record<ValueKind, string> = {
-  capacity: "Capacity",
-  revenue: "Revenue",
-  cost: "Cost",
-};
-
 function ValueTag({
-  value,
+  valueTagId,
+  valueTags,
   onFire,
   onChange,
+  onManage,
 }: {
-  value?: ValueKind;
+  valueTagId?: string;
+  valueTags: Tag[];
   onFire?: boolean;
-  onChange: (next: ValueKind) => void;
+  onChange: (next: string | undefined) => void;
+  onManage: () => void;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          data-no-toggle
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition",
-            value
-              ? VALUE_STYLES[value]
-              : "border-dashed border-border bg-transparent text-muted-foreground hover:bg-secondary",
-            onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
-          )}
-        >
-          {value ? VALUE_LABELS[value] : "Set value"}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
-        {(Object.keys(VALUE_LABELS) as ValueKind[]).map((k) => (
-          <DropdownMenuItem key={k} onClick={() => onChange(k)}>
-            <span className={cn("mr-2 h-2.5 w-2.5 rounded-full border", VALUE_STYLES[k])} />
-            {VALUE_LABELS[k]}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <span
+      className={cn(
+        "inline-flex rounded-full",
+        onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+      )}
+    >
+      <TagPicker
+        tags={valueTags}
+        value={valueTagId}
+        onChange={onChange}
+        onManage={onManage}
+        placeholder="Set value"
+        manageLabel="Manage value tags…"
+      />
+    </span>
   );
 }
 
@@ -211,7 +192,7 @@ export function JourneyMap() {
                   {j.doc.stages.map((s, i) => {
                     const active = s.id === selectedStageId;
                     const dim = selectedStageId && !active;
-                    const onFire = showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(i);
+                    const onFire = showMoneyOnFire && !!s.onFire;
                     return (
                       <li
                         key={s.id}
@@ -223,11 +204,14 @@ export function JourneyMap() {
                           active={active}
                           dim={!!dim}
                           onFire={onFire}
+                          valueTags={j.doc.valueTags}
                           onSelect={() =>
                             setSelectedStageId((cur) => (cur === s.id ? null : s.id))
                           }
                           onRename={(patch) => j.setStage(s.id, patch)}
-                          onValueChange={(value) => j.setStage(s.id, { value })}
+                          onValueChange={(valueTagId) => j.setStage(s.id, { valueTagId })}
+                          onToggleOnFire={() => j.toggleStageOnFire(s.id)}
+                          onManageValueTags={() => setTagManagerOpen(true)}
                           onMove={(dir) => j.moveStage(s.id, dir)}
                           onInsertAfter={() => j.addStage(i)}
                           onDelete={() => {
@@ -267,15 +251,30 @@ export function JourneyMap() {
                   <div className="mt-4 font-display text-[120px] leading-none font-semibold tracking-tighter text-foreground/90">
                     {String(selectedIndex + 1).padStart(2, "0")}
                   </div>
-                  <div className="mt-6 flex items-center gap-3">
+                  <div className="mt-6 flex items-center gap-3 flex-wrap">
                     <div className="h-12 w-12 rounded-full bg-secondary border border-border flex items-center justify-center text-2xl">
                       {selectedStage.emoji}
                     </div>
                     <ValueTag
-                      value={selectedStage.value}
-                      onFire={showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(selectedIndex)}
-                      onChange={(value) => j.setStage(selectedStage.id, { value })}
+                      valueTagId={selectedStage.valueTagId}
+                      valueTags={j.doc.valueTags}
+                      onFire={showMoneyOnFire && !!selectedStage.onFire}
+                      onChange={(valueTagId) => j.setStage(selectedStage.id, { valueTagId })}
+                      onManage={() => setTagManagerOpen(true)}
                     />
+                    <button
+                      onClick={() => j.toggleStageOnFire(selectedStage.id)}
+                      aria-pressed={!!selectedStage.onFire}
+                      title={selectedStage.onFire ? "Unmark money on fire" : "Mark money on fire"}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider transition",
+                        selectedStage.onFire
+                          ? "bg-destructive text-destructive-foreground border-destructive"
+                          : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary",
+                      )}
+                    >
+                      <Flame className="h-3 w-3" /> Money on fire
+                    </button>
                   </div>
                   <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight">
                     <EditableText
@@ -293,7 +292,7 @@ export function JourneyMap() {
                 </div>
 
                 {/* Exists / Doesn't Exist cards */}
-                <div className="space-y-5">
+                <div className="grid gap-5 md:grid-cols-2 items-start">
                   <LineListCard
                     title="What Exists Today"
                     subtitle="Tools, processes, and assets in place today."
@@ -351,6 +350,11 @@ export function JourneyMap() {
         onRename={j.renameTag}
         onSetColor={j.setTagColor}
         onDelete={j.deleteTag}
+        valueTags={j.doc.valueTags}
+        onAddValueTag={() => j.addValueTag()}
+        onRenameValueTag={j.renameValueTag}
+        onSetValueTagColor={j.setValueTagColor}
+        onDeleteValueTag={j.deleteValueTag}
       />
     </TooltipProvider>
   );
@@ -358,13 +362,16 @@ export function JourneyMap() {
 
 type StageCardProps = {
   index: number;
-  stage: { id: string; emoji: string; title: string; subtitle: string; value?: ValueKind };
+  stage: Stage;
+  valueTags: Tag[];
   active: boolean;
   dim: boolean;
   onFire: boolean;
   onSelect: () => void;
   onRename: (patch: Partial<{ emoji: string; title: string; subtitle: string }>) => void;
-  onValueChange: (value: ValueKind) => void;
+  onValueChange: (valueTagId: string | undefined) => void;
+  onToggleOnFire: () => void;
+  onManageValueTags: () => void;
   onMove: (dir: -1 | 1) => void;
   onInsertAfter: () => void;
   onDelete: () => void;
@@ -373,12 +380,15 @@ type StageCardProps = {
 function StageCard({
   index,
   stage,
+  valueTags,
   active,
   dim,
   onFire,
   onSelect,
   onRename,
   onValueChange,
+  onToggleOnFire,
+  onManageValueTags,
   onMove,
   onInsertAfter,
   onDelete,
@@ -432,6 +442,11 @@ function StageCard({
               <Plus className="h-4 w-4 mr-2" /> Insert after
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onToggleOnFire}>
+              <Flame className="h-4 w-4 mr-2" />
+              {stage.onFire ? "Unmark money on fire" : "Mark money on fire"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={onDelete}>
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </DropdownMenuItem>
@@ -456,7 +471,13 @@ function StageCard({
           className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground"
         />
         <div className="mt-2">
-          <ValueTag value={stage.value} onFire={onFire} onChange={onValueChange} />
+          <ValueTag
+            valueTagId={stage.valueTagId}
+            valueTags={valueTags}
+            onFire={onFire}
+            onChange={onValueChange}
+            onManage={onManageValueTags}
+          />
         </div>
         <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground line-clamp-3">
           <EditableText
@@ -472,87 +493,5 @@ function StageCard({
         <span className="absolute left-5 right-5 -bottom-px h-0.5 rounded-full bg-primary" />
       )}
     </div>
-  );
-}
-
-type LineListCardProps = {
-  title: string;
-  subtitle?: string;
-  accent?: "default" | "destructive";
-  lines: import("@/lib/journey-data").Line[];
-  tags: import("@/lib/journey-data").Tag[];
-  onAddLine: () => void;
-  onUpdateLine: (id: string, patch: Partial<import("@/lib/journey-data").Line>) => void;
-  onDeleteLine: (id: string) => void;
-  onMoveLine: (id: string, dir: -1 | 1) => void;
-  onManageTags: () => void;
-};
-
-function LineListCard({
-  title,
-  subtitle,
-  accent = "default",
-  lines,
-  tags,
-  onAddLine,
-  onUpdateLine,
-  onDeleteLine,
-  onMoveLine,
-  onManageTags,
-}: LineListCardProps) {
-  const isGap = accent === "destructive";
-  return (
-    <article
-      className={cn(
-        "rounded-2xl border bg-card p-6 transition-shadow",
-        isGap ? "border-destructive/25" : "border-border",
-      )}
-      style={{ boxShadow: "var(--shadow-card)" }}
-    >
-      <header className="mb-4 flex items-baseline justify-between gap-3">
-        <div>
-          <h3
-            className={cn(
-              "font-display text-lg font-semibold tracking-tight",
-              isGap ? "text-destructive" : "text-foreground",
-            )}
-          >
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="mt-0.5 text-[12px] text-muted-foreground">{subtitle}</p>
-          )}
-        </div>
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          {lines.length}
-        </span>
-      </header>
-      <div className="space-y-2">
-        {lines.map((line) => (
-          <LineRow
-            key={line.id}
-            line={line}
-            tags={tags}
-            isGap={isGap}
-            onChange={(patch) => onUpdateLine(line.id, patch)}
-            onDelete={() => onDeleteLine(line.id)}
-            onMove={(dir) => onMoveLine(line.id, dir)}
-            onToggleExists={() => onUpdateLine(line.id, { exists: !line.exists })}
-            onManageTags={onManageTags}
-          />
-        ))}
-        {lines.length === 0 && (
-          <p className="text-[12.5px] italic text-muted-foreground py-2">
-            Nothing here yet.
-          </p>
-        )}
-      </div>
-      <button
-        onClick={onAddLine}
-        className="mt-3 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition"
-      >
-        <Plus className="h-3 w-3" /> Add line
-      </button>
-    </article>
   );
 }
