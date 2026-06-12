@@ -32,7 +32,7 @@ export function EditableText({ value, onChange, className, multiline, placeholde
       <div
         onClick={() => setEditing(true)}
         className={cn(
-          "cursor-text rounded px-1 -mx-1 hover:bg-accent/60 whitespace-pre-wrap",
+          "cursor-text rounded whitespace-pre-wrap transition-colors hover-underline",
           !value && "text-muted-foreground italic",
           className,
         )}
@@ -57,7 +57,7 @@ export function EditableText({ value, onChange, className, multiline, placeholde
       }
     },
     className: cn(
-      "w-full rounded border border-input bg-background px-1 py-0.5 outline-none ring-2 ring-ring/40",
+      "w-full rounded-md border border-input bg-background px-2 py-1 outline-none ring-2 ring-ring/40 font-[inherit]",
       className,
     ),
   };
