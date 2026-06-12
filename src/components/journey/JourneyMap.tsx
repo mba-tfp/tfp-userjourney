@@ -380,10 +380,10 @@ type StageCardProps = {
   stage: { id: string; emoji: string; title: string; subtitle: string; value?: ValueKind };
   active: boolean;
   dim: boolean;
-  sentiment: { emoji: string; label: string };
   onFire: boolean;
   onSelect: () => void;
   onRename: (patch: Partial<{ emoji: string; title: string; subtitle: string }>) => void;
+  onValueChange: (value: ValueKind) => void;
   onMove: (dir: -1 | 1) => void;
   onInsertAfter: () => void;
   onDelete: () => void;
@@ -394,10 +394,10 @@ function StageCard({
   stage,
   active,
   dim,
-  sentiment,
   onFire,
   onSelect,
   onRename,
+  onValueChange,
   onMove,
   onInsertAfter,
   onDelete,
@@ -474,11 +474,9 @@ function StageCard({
           onChange={(title) => onRename({ title })}
           className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground"
         />
-        {stage.value && (
-          <div className="mt-2">
-            <ValueTag value={stage.value} onFire={onFire} />
-          </div>
-        )}
+        <div className="mt-2">
+          <ValueTag value={stage.value} onFire={onFire} onChange={onValueChange} />
+        </div>
         <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground line-clamp-3">
           <EditableText
             multiline
@@ -486,25 +484,6 @@ function StageCard({
             onChange={(subtitle) => onRename({ subtitle })}
           />
         </div>
-      </div>
-
-      {/* Sentiment pill */}
-      <div className="mt-5 pt-4 border-t border-border/70">
-        {sentiment.emoji || sentiment.label ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-medium",
-              active ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground/80",
-            )}
-          >
-            <span className="text-sm leading-none">{sentiment.emoji}</span>
-            {sentiment.label}
-          </span>
-        ) : (
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
-            No sentiment
-          </span>
-        )}
       </div>
 
       {/* Active accent bar */}
