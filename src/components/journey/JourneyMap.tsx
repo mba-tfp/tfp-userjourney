@@ -2,9 +2,7 @@ import { useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
   Plus,
-  Trash2,
   Download,
   Upload,
   RotateCcw,
@@ -12,20 +10,14 @@ import {
   Tag as TagIcon,
   Flame,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useJourney } from "@/lib/journey-store";
 import { EditableText } from "./EditableText";
 import { LineListCard } from "./LineListCard";
+import { StageLifecycle } from "./StageLifecycle";
 import { TagManagerDialog } from "./TagManagerDialog";
 import { TagPicker } from "./TagPicker";
-import type { Stage, Tag } from "@/lib/journey-data";
+import type { Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
 
 function ValueTag({
@@ -63,7 +55,6 @@ function ValueTag({
 export function JourneyMap() {
   const j = useJourney();
   const fileRef = useRef<HTMLInputElement>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
@@ -95,10 +86,6 @@ export function JourneyMap() {
     } finally {
       e.target.value = "";
     }
-  };
-
-  const scrollStrip = (dir: -1 | 1) => {
-    stripRef.current?.scrollBy({ left: dir * 360, behavior: "smooth" });
   };
 
   const tool = (icon: React.ReactNode, label: string, onClick: () => void) => (
