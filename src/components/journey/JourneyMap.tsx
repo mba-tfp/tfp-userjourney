@@ -10,6 +10,7 @@ import {
   RotateCcw,
   X,
   Layers,
+  Flame,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +25,34 @@ import { useJourney } from "@/lib/journey-store";
 import { EditableText } from "./EditableText";
 import { CellEditor } from "./CellEditor";
 import { cn } from "@/lib/utils";
+
+const MONEY_ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
+
+type ValueKind = "capacity" | "revenue" | "cost";
+
+function ValueTag({ value, onFire }: { value: ValueKind; onFire?: boolean }) {
+  const styles: Record<ValueKind, string> = {
+    capacity: "bg-teal-100 text-teal-800 border-teal-200",
+    revenue: "bg-blue-100 text-blue-800 border-blue-200",
+    cost: "bg-amber-100 text-amber-900 border-amber-200",
+  };
+  const labels: Record<ValueKind, string> = {
+    capacity: "Capacity",
+    revenue: "Revenue",
+    cost: "Cost",
+  };
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+        styles[value],
+        onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+      )}
+    >
+      {labels[value]}
+    </span>
+  );
+}
 
 // Parse "😊 Hopeful" → { emoji, label }
 function parseSentiment(text: string) {
@@ -40,6 +69,7 @@ export function JourneyMap() {
   const fileRef = useRef<HTMLInputElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
 
   const sentimentLens =
     j.doc.lenses.find((l) => l.name.toLowerCase() === "sentiment") ?? j.doc.lenses[0];
@@ -117,6 +147,25 @@ export function JourneyMap() {
               {tool(<RotateCcw className="h-4 w-4" />, "Reset to defaults", () => {
                 if (confirm("Reset to default content? Your edits will be lost.")) j.reset();
               })}
+              <span className="mx-1 h-5 w-px bg-border" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowMoneyOnFire((v) => !v)}
+                    aria-pressed={showMoneyOnFire}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-medium border transition",
+                      showMoneyOnFire
+                        ? "bg-destructive text-destructive-foreground border-destructive shadow-sm"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary",
+                    )}
+                  >
+                    <Flame className="h-3.5 w-3.5" />
+                    Money on fire
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Highlight stages losing money</TooltipContent>
+              </Tooltip>
               <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImport} />
             </div>
           </div>
@@ -152,6 +201,7 @@ export function JourneyMap() {
                     const sentiment = parseSentiment(sentimentText ?? "");
                     const active = s.id === selectedStageId;
                     const dim = selectedStageId && !active;
+                    const onFire = showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(i);
                     return (
                       <li
                         key={s.id}
@@ -163,6 +213,7 @@ export function JourneyMap() {
                           active={active}
                           dim={!!dim}
                           sentiment={sentiment}
+                          onFire={onFire}
                           onSelect={() =>
                             setSelectedStageId((cur) => (cur === s.id ? null : s.id))
                           }
@@ -215,6 +266,12 @@ export function JourneyMap() {
                         <span className="text-sm">{selectedSentiment.emoji}</span>
                         {selectedSentiment.label}
                       </span>
+                    )}
+                    {selectedStage.value && (
+                      <ValueTag
+                        value={selectedStage.value}
+                        onFire={showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(selectedIndex)}
+                      />
                     )}
                   </div>
                   <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight">
@@ -320,10 +377,11 @@ export function JourneyMap() {
 
 type StageCardProps = {
   index: number;
-  stage: { id: string; emoji: string; title: string; subtitle: string };
+  stage: { id: string; emoji: string; title: string; subtitle: string; value?: ValueKind };
   active: boolean;
   dim: boolean;
   sentiment: { emoji: string; label: string };
+  onFire: boolean;
   onSelect: () => void;
   onRename: (patch: Partial<{ emoji: string; title: string; subtitle: string }>) => void;
   onMove: (dir: -1 | 1) => void;
@@ -337,6 +395,7 @@ function StageCard({
   active,
   dim,
   sentiment,
+  onFire,
   onSelect,
   onRename,
   onMove,
@@ -415,6 +474,11 @@ function StageCard({
           onChange={(title) => onRename({ title })}
           className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground"
         />
+        {stage.value && (
+          <div className="mt-2">
+            <ValueTag value={stage.value} onFire={onFire} />
+          </div>
+        )}
         <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground line-clamp-3">
           <EditableText
             multiline

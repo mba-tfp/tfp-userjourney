@@ -1,38 +1,28 @@
-## Redesign — Editorial Cloud White
+## Goal
+Add a single colored "Value" tag (Capacity / Revenue / Cost) under each stage name, plus a top-bar toggle that highlights money-losing stages with a red outline. Lens rows (Patient, Clinic, TFP, Channel, etc.) stay exactly as they are.
 
-Locked tokens: Cloud White palette `#fafbfc / #e8ecf1 / #94a3b8 / #3b82f6`, Space Grotesk (display) + DM Sans (body), Magazine layout.
+## Changes
 
-### Tokens & fonts
-- `src/routes/__root.tsx` — add Google Fonts `<link>` for Space Grotesk + DM Sans.
-- `src/styles.css` — rewrite `:root` to Cloud White in oklch, register `--font-display` and `--font-sans` in `@theme`, set body to DM Sans, headings/numerals to Space Grotesk. Add `--shadow-card` and a `.dot-bg` utility (faint dot pattern for the page background).
+### 1. `src/lib/journey-data.ts`
+- Extend `Stage` type with `value: "capacity" | "revenue" | "cost"`.
+- Add the same field to `stageDefs` with this mapping (stages are 1-indexed):
+  - 1 Capacity, 2 Revenue, 3 Cost, 4 Capacity, 5 Cost, 6 Revenue, 7 Capacity, 8 Capacity, 9 Revenue, 10 Revenue, 11 Revenue.
 
-### Header (masthead)
-- Sticky, generous vertical space. Thin uppercase eyebrow ("The Fertility Partners · Patient Journey"), oversized editable title in Space Grotesk with tight tracking.
-- Toolbar collapses to icon-only ghost buttons with tooltips (Add Lens, Add Stage, Export, Import, Reset).
+### 2. `src/components/journey/JourneyMap.tsx`
+- Add `showMoneyOnFire` state (default `false`) and a `MONEY_ON_FIRE_INDEXES = new Set([2,5,8,9,10])` (0-based for stages 3, 6, 9, 10, 11).
+- In the masthead toolbar, add a labeled toggle (small pill button with Flame icon + "Money on fire" label, active state = filled accent). Keep tooltip; visually distinct from the icon-only tools.
+- New `ValueTag` component: small pill (`text-[10px] uppercase tracking-wide`, rounded-full, px-2 py-0.5) with color variants:
+  - capacity → teal (`bg-teal-100 text-teal-800 border-teal-200` style via inline classes, or token equivalents)
+  - revenue → blue (`bg-blue-100 text-blue-800 border-blue-200`)
+  - cost → amber (`bg-amber-100 text-amber-900 border-amber-200`)
+  - When `onFire` prop true → add `ring-2 ring-destructive ring-offset-1` red outline.
+- Pass `value` and `onFire` to `StageCard`. Render the tag inside the card directly under the title (before the subtitle).
+- Also render the tag in the magazine spread's feature column next to the sentiment pill, so the value is visible while expanded.
 
-### Stage strip
-- Horizontal scroll-snap row of stage cards. Each card: large display numeral "01"–"11" in Space Grotesk, circular monochrome glyph for the emoji, stage title, one-line subtitle, sentiment pill (emoji + label) at bottom.
-- Inactive cards: hairline border, off-white surface, soft hover lift. Active card: accent blue underline + lifted shadow, others dim to 70%.
-- Edge fade masks on left/right; left/right chevron buttons appear on hover.
+### 3. No changes
+- `CellEditor`, `EditableText`, `journey-store`, lens rows, persisted JSON migration handled by spreading defaults — existing localStorage docs missing `value` will simply render no tag until reset; acceptable per scope (mention in closing message).
 
-### Expanded magazine spread
-- When a stage is selected, a full-width band unfurls below with a subtle dot background.
-- Left feature column (~⅓): huge "Stage 07" eyebrow + numeral, title in display type, subtitle, sentiment pill, quiet Collapse link.
-- Right column (~⅔): 2-col bento of lens cards. Lens card = small uppercase eyebrow, hairline border, generous padding, lines rendered as chip rows with a small dot. Gap lines become a soft red-tinted pill with an alert icon — never raw red body text.
-
-### Micro-interactions
-- `EditableText`: hover shows a thin dotted underline; focus state uses a soft ring. No bg fill on hover.
-- `CellEditor`: per-line controls live in a faint right-side tray that fades in on hover. Add-line is a discreet "+ Add" link below the list.
-- Transitions ≤200ms ease-out for expand/collapse and active stage.
-
-### Files
-- `src/styles.css`
-- `src/routes/__root.tsx`
-- `src/components/journey/JourneyMap.tsx`
-- `src/components/journey/CellEditor.tsx`
-- `src/components/journey/EditableText.tsx`
-
-### Out of scope
-- Data model, editing flows, persistence.
-- Dark mode visual tuning.
-- New libraries (no Motion, no Magic UI).
+## Out of scope
+- Editing the value per stage from the UI.
+- Persisting the money-on-fire toggle.
+- Changing lens content.

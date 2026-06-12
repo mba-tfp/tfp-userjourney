@@ -5,6 +5,7 @@ export type Stage = {
   emoji: string;
   title: string;
   subtitle: string;
+  value?: "capacity" | "revenue" | "cost";
 };
 export type Lens = { id: string; name: string };
 export type JourneyDoc = {
@@ -18,17 +19,17 @@ export type JourneyDoc = {
 const uid = (p: string, i: number) => `${p}-${i}`;
 
 const stageDefs: Omit<Stage, "id">[] = [
-  { emoji: "🔍", title: "Awareness & Discovery", subtitle: "Pre-referral, website, GP search" },
-  { emoji: "🤔", title: "Consideration & Comparison", subtitle: "Evaluating TFP vs. competitors" },
-  { emoji: "📇", title: "Referral & Conversion", subtitle: "HCP sends referral; patient first contacted" },
-  { emoji: "📋", title: "Intake & Onboarding", subtitle: "Health history forms completed" },
-  { emoji: "🧪", title: "Pre-Diagnostic Testing", subtitle: "Blood work, ultrasound, semen analysis" },
-  { emoji: "📅", title: "Notify & Schedule", subtitle: "Consult booked; patient prepared" },
-  { emoji: "🩺", title: "Physician Consult", subtitle: "REI consult; results & care plan discussed" },
-  { emoji: "💊", title: "Care Planning & Readiness", subtitle: "Treatment plan set; patient prepares for cycle" },
-  { emoji: "⏳", title: "The Wait (Lab & 2-Week)", subtitle: "Egg retrieval; embryo culture; 2WW" },
-  { emoji: "🔄", title: "Outcome & Transition", subtitle: "Pregnancy result; OB handoff or next steps" },
-  { emoji: "♻️", title: "Continuity of Care", subtitle: "Cryo storage, re-entry, long-term support" },
+  { emoji: "🔍", title: "Awareness & Discovery", subtitle: "Pre-referral, website, GP search", value: "capacity" },
+  { emoji: "🤔", title: "Consideration & Comparison", subtitle: "Evaluating TFP vs. competitors", value: "revenue" },
+  { emoji: "📇", title: "Referral & Conversion", subtitle: "HCP sends referral; patient first contacted", value: "cost" },
+  { emoji: "📋", title: "Intake & Onboarding", subtitle: "Health history forms completed", value: "capacity" },
+  { emoji: "🧪", title: "Pre-Diagnostic Testing", subtitle: "Blood work, ultrasound, semen analysis", value: "cost" },
+  { emoji: "📅", title: "Notify & Schedule", subtitle: "Consult booked; patient prepared", value: "revenue" },
+  { emoji: "🩺", title: "Physician Consult", subtitle: "REI consult; results & care plan discussed", value: "capacity" },
+  { emoji: "💊", title: "Care Planning & Readiness", subtitle: "Treatment plan set; patient prepares for cycle", value: "capacity" },
+  { emoji: "⏳", title: "The Wait (Lab & 2-Week)", subtitle: "Egg retrieval; embryo culture; 2WW", value: "revenue" },
+  { emoji: "🔄", title: "Outcome & Transition", subtitle: "Pregnancy result; OB handoff or next steps", value: "revenue" },
+  { emoji: "♻️", title: "Continuity of Care", subtitle: "Cryo storage, re-entry, long-term support", value: "revenue" },
 ];
 
 const stages: Stage[] = stageDefs.map((s, i) => ({ ...s, id: uid("s", i + 1) }));
