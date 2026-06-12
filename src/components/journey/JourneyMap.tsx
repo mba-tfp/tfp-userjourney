@@ -93,12 +93,30 @@ export function JourneyMap() {
             Stage
           </div>
           {j.doc.stages.map((s, i) => (
-            <div key={s.id} className="border-b border-r p-3 group/header">
+            <div
+              key={s.id}
+              role="button"
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest("input, textarea, [data-no-toggle]")) return;
+                setSelectedStageId((cur) => (cur === s.id ? null : s.id));
+              }}
+              className={
+                "border-b border-r p-3 group/header cursor-pointer transition-colors " +
+                (selectedStageId === s.id
+                  ? "bg-accent/60 ring-2 ring-primary/40"
+                  : "hover:bg-accent/30")
+              }
+            >
               <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
                 <span>Stage {i + 1}</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="opacity-0 group-hover/header:opacity-100 transition">
+                    <button
+                      data-no-toggle
+                      onClick={(e) => e.stopPropagation()}
+                      className="opacity-0 group-hover/header:opacity-100 transition"
+                    >
                       <MoreVertical className="h-3.5 w-3.5" />
                     </button>
                   </DropdownMenuTrigger>
