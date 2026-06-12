@@ -9,10 +9,9 @@ import {
   Upload,
   RotateCcw,
   X,
-  Layers,
+  Tag as TagIcon,
   Flame,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +22,8 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useJourney } from "@/lib/journey-store";
 import { EditableText } from "./EditableText";
-import { CellEditor } from "./CellEditor";
+import { LineRow } from "./LineRow";
+import { TagManagerDialog } from "./TagManagerDialog";
 import { cn } from "@/lib/utils";
 
 const MONEY_ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
@@ -85,10 +85,13 @@ export function JourneyMap() {
   const stripRef = useRef<HTMLDivElement>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
-  const detailLenses = j.doc.lenses;
   const selectedStage = j.doc.stages.find((s) => s.id === selectedStageId) ?? null;
   const selectedIndex = selectedStage ? j.doc.stages.indexOf(selectedStage) : -1;
+  const stageLines = selectedStage ? j.doc.lines[selectedStage.id] ?? [] : [];
+  const existsLines = stageLines.filter((l) => l.exists);
+  const gapLines = stageLines.filter((l) => !l.exists);
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(j.doc, null, 2)], { type: "application/json" });
@@ -149,7 +152,7 @@ export function JourneyMap() {
               />
             </div>
             <div className="flex items-center gap-1 pt-2">
-              {tool(<Layers className="h-4 w-4" />, "Add lens", j.addLens)}
+              {tool(<TagIcon className="h-4 w-4" />, "Manage tags", () => setTagManagerOpen(true))}
               {tool(<Plus className="h-4 w-4" />, "Add stage", () => j.addStage())}
               <span className="mx-1 h-5 w-px bg-border" />
               {tool(<Download className="h-4 w-4" />, "Export JSON", exportJson)}
@@ -289,62 +292,31 @@ export function JourneyMap() {
                   </div>
                 </div>
 
-                {/* Lens bento */}
-                <div className="grid gap-4 sm:grid-cols-2 auto-rows-min">
-                  {detailLenses.map((lens, idx) => {
-                    const cell = j.doc.cells[lens.id]?.[selectedStage.id] ?? { lines: [{ text: "" }] };
-                    // First card spans 2 cols for editorial feel
-                    const span = idx === 0 ? "sm:col-span-2" : "";
-                    return (
-                      <article
-                        key={lens.id}
-                        className={cn(
-                          "group/lens rounded-2xl border border-border bg-card p-6 transition-shadow",
-                          span,
-                        )}
-                        style={{ boxShadow: "var(--shadow-card)" }}
-                      >
-                        <header className="flex items-center justify-between mb-4">
-                          <EditableText
-                            value={lens.name}
-                            onChange={(name) => j.setLens(lens.id, name)}
-                            className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
-                          />
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                data-no-toggle
-                                className="opacity-0 group-hover/lens:opacity-100 text-muted-foreground hover:text-foreground transition"
-                              >
-                                <MoreVertical className="h-3.5 w-3.5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => j.moveLens(lens.id, -1)}>
-                                Move up
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => j.moveLens(lens.id, 1)}>
-                                Move down
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => {
-                                  if (confirm(`Delete lens "${lens.name}"?`)) j.deleteLens(lens.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </header>
-                        <CellEditor
-                          cell={cell}
-                          onChange={(c) => j.setCell(lens.id, selectedStage.id, c)}
-                        />
-                      </article>
-                    );
-                  })}
+                {/* Exists / Doesn't Exist cards */}
+                <div className="space-y-5">
+                  <LineListCard
+                    title="What Exists Today"
+                    subtitle="Tools, processes, and assets in place today."
+                    lines={existsLines}
+                    tags={j.doc.tags}
+                    onAddLine={() => j.addLine(selectedStage.id, true)}
+                    onUpdateLine={(id, patch) => j.updateLine(selectedStage.id, id, patch)}
+                    onDeleteLine={(id) => j.deleteLine(selectedStage.id, id)}
+                    onMoveLine={(id, dir) => j.moveLine(selectedStage.id, id, dir)}
+                    onManageTags={() => setTagManagerOpen(true)}
+                  />
+                  <LineListCard
+                    title="What Doesn't Exist Today"
+                    subtitle="Gaps, missing capabilities, broken handoffs."
+                    accent="destructive"
+                    lines={gapLines}
+                    tags={j.doc.tags}
+                    onAddLine={() => j.addLine(selectedStage.id, false)}
+                    onUpdateLine={(id, patch) => j.updateLine(selectedStage.id, id, patch)}
+                    onDeleteLine={(id) => j.deleteLine(selectedStage.id, id)}
+                    onMoveLine={(id, dir) => j.moveLine(selectedStage.id, id, dir)}
+                    onManageTags={() => setTagManagerOpen(true)}
+                  />
                 </div>
               </div>
             </div>
@@ -371,6 +343,15 @@ export function JourneyMap() {
           Auto-saved locally · Click any text to edit
         </footer>
       </div>
+      <TagManagerDialog
+        open={tagManagerOpen}
+        onOpenChange={setTagManagerOpen}
+        tags={j.doc.tags}
+        onAdd={() => j.addTag()}
+        onRename={j.renameTag}
+        onSetColor={j.setTagColor}
+        onDelete={j.deleteTag}
+      />
     </TooltipProvider>
   );
 }
