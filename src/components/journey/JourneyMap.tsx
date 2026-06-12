@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { ChevronLeft, ChevronRight, MoreVertical, Plus, Trash2, Download, Upload, RotateCcw } from "lucide-react";
+import { useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, MoreVertical, Plus, Trash2, Download, Upload, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +15,12 @@ import { CellEditor } from "./CellEditor";
 export function JourneyMap() {
   const j = useJourney();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+
+  const sentimentLens =
+    j.doc.lenses.find((l) => l.name.toLowerCase() === "sentiment") ?? j.doc.lenses[0];
+  const detailLenses = j.doc.lenses.filter((l) => l.id !== sentimentLens?.id);
+  const selectedStage = j.doc.stages.find((s) => s.id === selectedStageId) ?? null;
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(j.doc, null, 2)], { type: "application/json" });
