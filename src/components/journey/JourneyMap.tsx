@@ -30,38 +30,53 @@ const MONEY_ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
 
 type ValueKind = "capacity" | "revenue" | "cost";
 
-function ValueTag({ value, onFire }: { value: ValueKind; onFire?: boolean }) {
-  const styles: Record<ValueKind, string> = {
-    capacity: "bg-teal-100 text-teal-800 border-teal-200",
-    revenue: "bg-blue-100 text-blue-800 border-blue-200",
-    cost: "bg-amber-100 text-amber-900 border-amber-200",
-  };
-  const labels: Record<ValueKind, string> = {
-    capacity: "Capacity",
-    revenue: "Revenue",
-    cost: "Cost",
-  };
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        styles[value],
-        onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
-      )}
-    >
-      {labels[value]}
-    </span>
-  );
-}
+const VALUE_STYLES: Record<ValueKind, string> = {
+  capacity: "bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200",
+  revenue: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200",
+  cost: "bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200",
+};
+const VALUE_LABELS: Record<ValueKind, string> = {
+  capacity: "Capacity",
+  revenue: "Revenue",
+  cost: "Cost",
+};
 
-// Parse "😊 Hopeful" → { emoji, label }
-function parseSentiment(text: string) {
-  const trimmed = text.trim();
-  if (!trimmed) return { emoji: "", label: "" };
-  // Match leading emoji (any non-letter/number run at start)
-  const m = trimmed.match(/^(\S+)\s+(.*)$/);
-  if (m && /\p{Extended_Pictographic}/u.test(m[1])) return { emoji: m[1], label: m[2] };
-  return { emoji: "", label: trimmed };
+function ValueTag({
+  value,
+  onFire,
+  onChange,
+}: {
+  value?: ValueKind;
+  onFire?: boolean;
+  onChange: (next: ValueKind) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          data-no-toggle
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition",
+            value
+              ? VALUE_STYLES[value]
+              : "border-dashed border-border bg-transparent text-muted-foreground hover:bg-secondary",
+            onFire && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+          )}
+        >
+          {value ? VALUE_LABELS[value] : "Set value"}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+        {(Object.keys(VALUE_LABELS) as ValueKind[]).map((k) => (
+          <DropdownMenuItem key={k} onClick={() => onChange(k)}>
+            <span className={cn("mr-2 h-2.5 w-2.5 rounded-full border", VALUE_STYLES[k])} />
+            {VALUE_LABELS[k]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function JourneyMap() {
