@@ -163,15 +163,54 @@ export function JourneyMap() {
             </div>
           ))}
 
-          {/* Rows */}
-          {j.doc.lenses.map((lens) => (
-            <Row key={lens.id} j={j} lensId={lens.id} />
-          ))}
+          {/* Only Sentiment row visible by default */}
+          {sentimentLens && <Row j={j} lensId={sentimentLens.id} />}
         </div>
       </div>
 
+      {selectedStage && (
+        <section className="border-t bg-muted/30 px-6 py-6">
+          <div className="mx-auto max-w-5xl">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{selectedStage.emoji}</span>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Stage {j.doc.stages.indexOf(selectedStage) + 1}
+                  </div>
+                  <h2 className="text-xl font-semibold">{selectedStage.title}</h2>
+                  <p className="text-sm text-muted-foreground">{selectedStage.subtitle}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedStageId(null)}>
+                <X className="h-4 w-4 mr-1" /> Collapse
+              </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {detailLenses.map((lens) => {
+                const cell =
+                  j.doc.cells[lens.id]?.[selectedStage.id] ?? { lines: [{ text: "" }] };
+                return (
+                  <div key={lens.id} className="rounded-lg border bg-background p-4">
+                    <EditableText
+                      value={lens.name}
+                      onChange={(name) => j.setLens(lens.id, name)}
+                      className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2"
+                    />
+                    <CellEditor
+                      cell={cell}
+                      onChange={(c) => j.setCell(lens.id, selectedStage.id, c)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       <footer className="px-6 py-6 text-center text-xs text-muted-foreground">
-        Auto-saved locally • Click any text to edit • Hover a cell for line and gap controls
+        Click a stage to expand its details • Auto-saved locally • Click any text to edit
       </footer>
     </div>
   );
