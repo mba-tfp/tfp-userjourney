@@ -14,6 +14,12 @@ function load(): JourneyDoc {
       ...s,
       value: s.value ?? seedDoc.stages[i]?.value,
     }));
+    // Drop the legacy Sentiment lens from cached docs
+    const sentiment = parsed.lenses.find((l) => l.name.toLowerCase() === "sentiment");
+    if (sentiment) {
+      parsed.lenses = parsed.lenses.filter((l) => l.id !== sentiment.id);
+      delete parsed.cells[sentiment.id];
+    }
     return parsed;
   } catch {
     return seedDoc;
