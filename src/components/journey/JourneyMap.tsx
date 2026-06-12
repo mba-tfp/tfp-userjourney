@@ -86,14 +86,9 @@ export function JourneyMap() {
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
 
-  const sentimentLens =
-    j.doc.lenses.find((l) => l.name.toLowerCase() === "sentiment") ?? j.doc.lenses[0];
-  const detailLenses = j.doc.lenses.filter((l) => l.id !== sentimentLens?.id);
+  const detailLenses = j.doc.lenses;
   const selectedStage = j.doc.stages.find((s) => s.id === selectedStageId) ?? null;
   const selectedIndex = selectedStage ? j.doc.stages.indexOf(selectedStage) : -1;
-  const selectedSentiment = selectedStage && sentimentLens
-    ? parseSentiment(j.doc.cells[sentimentLens.id]?.[selectedStage.id]?.lines[0]?.text ?? "")
-    : null;
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(j.doc, null, 2)], { type: "application/json" });
@@ -211,9 +206,6 @@ export function JourneyMap() {
               >
                 <ol className="flex gap-4 items-stretch">
                   {j.doc.stages.map((s, i) => {
-                    const sentimentText =
-                      sentimentLens && j.doc.cells[sentimentLens.id]?.[s.id]?.lines[0]?.text;
-                    const sentiment = parseSentiment(sentimentText ?? "");
                     const active = s.id === selectedStageId;
                     const dim = selectedStageId && !active;
                     const onFire = showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(i);
@@ -227,12 +219,12 @@ export function JourneyMap() {
                           stage={s}
                           active={active}
                           dim={!!dim}
-                          sentiment={sentiment}
                           onFire={onFire}
                           onSelect={() =>
                             setSelectedStageId((cur) => (cur === s.id ? null : s.id))
                           }
                           onRename={(patch) => j.setStage(s.id, patch)}
+                          onValueChange={(value) => j.setStage(s.id, { value })}
                           onMove={(dir) => j.moveStage(s.id, dir)}
                           onInsertAfter={() => j.addStage(i)}
                           onDelete={() => {
@@ -276,18 +268,11 @@ export function JourneyMap() {
                     <div className="h-12 w-12 rounded-full bg-secondary border border-border flex items-center justify-center text-2xl">
                       {selectedStage.emoji}
                     </div>
-                    {selectedSentiment && (selectedSentiment.emoji || selectedSentiment.label) && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
-                        <span className="text-sm">{selectedSentiment.emoji}</span>
-                        {selectedSentiment.label}
-                      </span>
-                    )}
-                    {selectedStage.value && (
-                      <ValueTag
-                        value={selectedStage.value}
-                        onFire={showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(selectedIndex)}
-                      />
-                    )}
+                    <ValueTag
+                      value={selectedStage.value}
+                      onFire={showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(selectedIndex)}
+                      onChange={(value) => j.setStage(selectedStage.id, { value })}
+                    />
                   </div>
                   <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight">
                     <EditableText
