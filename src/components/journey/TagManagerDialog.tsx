@@ -19,6 +19,11 @@ type Props = {
   onRename: (id: string, name: string) => void;
   onSetColor: (id: string, color: TagColor) => void;
   onDelete: (id: string) => void;
+  valueTags?: Tag[];
+  onAddValueTag?: () => void;
+  onRenameValueTag?: (id: string, name: string) => void;
+  onSetValueTagColor?: (id: string, color: TagColor) => void;
+  onDeleteValueTag?: (id: string) => void;
 };
 
 export function TagManagerDialog({
@@ -29,6 +34,11 @@ export function TagManagerDialog({
   onRename,
   onSetColor,
   onDelete,
+  valueTags,
+  onAddValueTag,
+  onRenameValueTag,
+  onSetValueTagColor,
+  onDeleteValueTag,
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -36,10 +46,11 @@ export function TagManagerDialog({
         <DialogHeader>
           <DialogTitle>Manage tags</DialogTitle>
           <DialogDescription>
-            Tags label every line as Patient, Clinic, TFP, Channel, or whatever you need.
+            Line tags label each row (Patient, Clinic, TFP, Channel…). Value tags label each stage (Capacity, Revenue, Cost…). Both are fully editable.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mt-2">Line tags</div>
+        <div className="space-y-2 max-h-[36vh] overflow-y-auto pr-1">
           {tags.map((t) => (
             <div
               key={t.id}
@@ -75,8 +86,52 @@ export function TagManagerDialog({
           onClick={onAdd}
           className="inline-flex items-center gap-1.5 self-start rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition"
         >
-          <Plus className="h-3.5 w-3.5" /> Add tag
+          <Plus className="h-3.5 w-3.5" /> Add line tag
         </button>
+
+        {valueTags && onAddValueTag && onRenameValueTag && onSetValueTagColor && onDeleteValueTag && (
+          <>
+            <div className="mt-4 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Value tags</div>
+            <div className="space-y-2 max-h-[36vh] overflow-y-auto pr-1">
+              {valueTags.map((t) => (
+                <div
+                  key={t.id}
+                  className="group flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2"
+                >
+                  <ColorSwatch
+                    color={t.color as TagColor}
+                    onChange={(c) => onSetValueTagColor(t.id, c)}
+                  />
+                  <EditableText
+                    value={t.name}
+                    onChange={(name) => onRenameValueTag(t.id, name)}
+                    className="flex-1 text-sm font-medium"
+                  />
+                  <button
+                    title="Delete value tag"
+                    onClick={() => {
+                      if (confirm(`Delete value tag "${t.name}"? Stages using it will become unset.`)) {
+                        onDeleteValueTag(t.id);
+                      }
+                    }}
+                    className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground hover:text-destructive transition"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              {valueTags.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No value tags yet.</p>
+              )}
+            </div>
+            <button
+              onClick={onAddValueTag}
+              className="inline-flex items-center gap-1.5 self-start rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add value tag
+            </button>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

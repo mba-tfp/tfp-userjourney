@@ -1,71 +1,44 @@
-## Goal
-Replace the 5 lens cards per stage with two cards — "What Exists Today" and "What Doesn't Exist Today" — where each line carries a colored tag (Patient, Clinic, TFP, Channel, What Exists Today). The tag list is editable globally. Each line has an explicit exists/doesn't-exist toggle that decides which card it appears in.
+# Answering your questions first
 
-## Data model
+- **"Mark as gap"** isn't a button anymore. The ↔ icon on each line just moves the line between the two cards ("What Exists Today" ↔ "What Doesn't Exist Today"). The card a line lives in *is* its gap status — there's no separate flag. I'll relabel the tooltip to "Move to other card" so this is obvious.
+- **Capacity / Revenue / Cost aren't editable today** because they're hardcoded in `JourneyMap.tsx` (`VALUE_LABELS`, `VALUE_STYLES`). I'll lift them into the same editable registry pattern as tags so you can rename, recolor, add, and delete them.
 
-`CellLine` becomes line-level with its own metadata, and lines live in a single per-stage pool rather than per-lens cells.
+# What I'll build
 
-```ts
-type Tag = { id: string; name: string; color: string };
-type Line = { id: string; text: string; tagId?: string; exists: boolean };
-type Stage = { id; emoji; title; subtitle; value? };
-type JourneyDoc = {
-  title: string;
-  stages: Stage[];
-  tags: Tag[];                  // editable, replaces lenses
-  lines: Record<string, Line[]>; // lines[stageId] = ordered Line[]
-};
-```
+## 1. Side-by-side comparison
+Change the magazine spread's right column from `space-y-5` (stacked) to a 2-column grid so "What Exists Today" and "What Doesn't Exist Today" sit beside each other on desktop, stacking on narrow screens. The left feature column (numeral, stage title) stays as-is.
 
-Seed `tags` from the current lens names (What Exists Today, Patient, Clinic, TFP, Channel) with the existing palette. Migrate every existing cell line into `lines[stageId]`, set `tagId` to the lens it came from, and set `exists = !line.gap` (so today's red "✗ No …" lines auto-land in "What Doesn't Exist").
+## 2. Tag legend + counts per card
+Above each card's line list, add a compact legend strip:
+- One pill per tag used by lines *in that card*, colored with the tag's color, suffixed with the count (e.g. `Patient 3`, `Clinic 1`).
+- An "Untagged N" pill when applicable.
+- Hidden when the card has 0 lines.
 
-Persisted docs in localStorage are migrated on load (one-shot v1 → v2 migration keyed on doc shape).
+## 3. Tag filter chips per card
+The same pills double as filter chips. Click toggles a per-card filter set (independent for Exists vs Doesn't-Exist). Active chips get a solid background; the line list only renders matching lines. A small "Clear" link appears when any filter is active. Filter state is local component state (per stage view) — not persisted.
 
-## UI
+## 4. Per-stage money-on-fire
+Today, the global "Money on fire" toggle highlights a fixed set of stage indexes. I'll change it so:
+- Each stage carries `onFire?: boolean` in its data (default seeded from the current `MONEY_ON_FIRE_INDEXES` set so existing visuals don't change).
+- The stage card's dropdown menu (the ⋮) gets a "Toggle money on fire" item.
+- The selected-stage feature column gets a 🔥 toggle button next to the Value tag.
+- The global toolbar button stays, but now just *shows/hides* the highlight (it doesn't decide which stages are on fire).
 
-**Magazine spread (expanded stage)** — replace the bento grid with two stacked cards:
+## 5. Editable Value tags (Capacity / Revenue / Cost)
+- Introduce `valueTags: ValueTag[]` on the doc (id, name, color) seeded with Capacity (teal), Revenue (blue), Cost (amber).
+- Stage's `value` field becomes a `valueTagId` reference.
+- The `ValueTag` button reads name+color from the registry; the picker dropdown lists registry entries plus "Manage value tags…".
+- Extend the existing `TagManagerDialog` with a second section "Value tags" (same add/rename/recolor/delete UI) — one dialog, two registries.
+- Migration: on load, map existing string values (`"capacity"`/`"revenue"`/`"cost"`) to the corresponding seeded value-tag id.
 
-```text
-┌─ What Exists Today ──────────────┐
-│ • [Patient] No digital resource… │
-│ • [TFP]     52% of market…       │
-│ + Add line                       │
-└──────────────────────────────────┘
-┌─ What Doesn't Exist Today ───────┐
-│ • [Clinic]  No REI waitlist…     │
-│ • [Channel] No HCP co-marketing… │
-│ + Add line                       │
-└──────────────────────────────────┘
-```
+# Files touched
 
-Each line shows:
-- Tag pill on the left — click to open a picker (existing tags + "Manage tags…").
-- Editable text (existing `EditableText`).
-- Hover tray: toggle exists/doesn't-exist (moves the line between cards), delete.
+- `src/lib/journey-data.ts` — add `ValueTag` type, `valueTags` on doc, change `Stage.value` to `valueTagId?: string`, seed value tags, add per-stage `onFire`.
+- `src/lib/journey-store.ts` — migration for string→id and `onFire` seed; CRUD for value tags (`addValueTag`, `renameValueTag`, `setValueTagColor`, `deleteValueTag`); `toggleStageOnFire`.
+- `src/components/journey/JourneyMap.tsx` — side-by-side grid; per-stage on-fire wiring; replace hardcoded `VALUE_STYLES`/`VALUE_LABELS` with registry-driven `ValueTag` component; rename ↔ tooltip.
+- `src/components/journey/LineListCard.tsx` *(new)* — extracted from `JourneyMap.tsx`, owns legend + filter chip state.
+- `src/components/journey/TagManagerDialog.tsx` — add Value-tags section; accept both registries via props.
+- `src/components/journey/LineRow.tsx` — tooltip copy update only.
 
-"+ Add line" inside each card creates a line pre-set to that card's exists value, tag empty.
-
-**Tag manager** — a small dialog (or popover from any tag picker) to rename, add, delete, recolor tags. Used by tag pickers across all stages.
-
-**Stage card (collapsed)** — keep as-is; the sentiment area is already gone. No tag chips here to keep the strip uncluttered.
-
-## Components
-
-- `src/lib/journey-data.ts` — new types, seed tags, seed `lines` derived from existing rows.
-- `src/lib/journey-store.ts` — replace `setCell` with line CRUD (`addLine`, `updateLine`, `deleteLine`, `moveLine`, `setLineExists`, `setLineTag`); add tag CRUD (`addTag`, `renameTag`, `setTagColor`, `deleteTag`). Add migration in `load()` for v1 docs.
-- `src/components/journey/JourneyMap.tsx` — swap the lens bento for two `LineList` cards.
-- `src/components/journey/LineList.tsx` (new) — renders one card (title, lines, add button).
-- `src/components/journey/LineRow.tsx` (new) — tag pill + editable text + hover tray.
-- `src/components/journey/TagPicker.tsx` (new) — dropdown listing tags with color swatches and "Manage tags…".
-- `src/components/journey/TagManagerDialog.tsx` (new) — add/rename/recolor/delete tags.
-- `CellEditor.tsx` — retired (delete) once the new components are in place.
-
-## Out of scope
-- Drag-to-reorder lines (use up/down in hover tray instead).
-- Per-tag filtering on the spread.
-- Bulk re-tagging.
-- Changes to the stage strip, masthead, or money-on-fire toggle.
-
-## Notes
-- Existing `gap`-flagged lines automatically migrate to "What Doesn't Exist"; everything else lands in "What Exists Today". You can flip any line afterward with the toggle.
-- Tag colors reuse the existing token palette so the redesign stays on-theme.
+# Out of scope
+Drag-and-drop reordering, cross-stage filtering, persisting filter selections, exporting filter state, changing the underlying "exists/gap" semantics.
