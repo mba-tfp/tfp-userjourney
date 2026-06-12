@@ -1,51 +1,39 @@
-# Circular Lifecycle Stage Layout
+# Make the Lifecycle Ring Readable
 
-Replace the horizontal scrolling stage strip with a closed-loop circle so every stage is visible at once. Click behavior and the existing magazine detail spread stay exactly as they are today.
+Keep the circular lifecycle layout but fix the three issues you flagged: stage order is hard to read, labels are cramped, and editing inside nodes is fiddly.
 
-## Layout
+## 1. Make order obvious
 
-- New component `StageLifecycle.tsx` renders a single square SVG (responsive, max ~640px) inside the existing `<section>` that currently holds the strip.
-- Stages are evenly distributed around a circle (angle = `i * 2π / n`, starting at 12 o'clock).
-- Between each adjacent pair, draw a thin arc segment with a small arrowhead at the midpoint — the arrows go clockwise around the ring, closing the loop back to stage 1 so it reads as a lifecycle.
-- Each stage is rendered as an absolutely-positioned node (HTML overlay on top of the SVG, using percentage coords) so existing typography, emoji bubble, edit affordances, and the `ValueTag` picker can be reused without re-implementing in SVG.
+- **"Start here" marker**: render a small chip just outside the ring next to stage 01 (12 o'clock) with the label `Start` and a downward arrow pointing into the node. Persistent — not hover-only.
+- **Numbered arrows**: each connector arc gets a small numbered badge at its midpoint (`→ 2`, `→ 3`, …) so the reading order is explicit instead of inferred from clockwise direction.
+- **Stronger clockwise cue**: thicken the connector arcs (1.5 → 2.5px), darken from `--border` to `--muted-foreground` at 40%, enlarge arrowheads ~50%.
+- **Active-stage highlight on the path**: when a stage is selected, the arc *leading into* it gets `--primary` color so you can see "you are here" within the flow.
 
-## Stage node
+## 2. Fix cramped labels
 
-Compact circular node (~120px) replacing the 280px card:
-- Top: numeral (`01`, `02`, …) — small, muted; primary color when active.
-- Center: existing 56px emoji bubble (editable via `EditableText`, same as today).
-- Below bubble: stage title (single line, truncated, editable on click-through guard).
-- Tiny `ValueTag` chip under the title.
-- `MoreVertical` menu appears on hover (same dropdown items as today: move left/right, insert after, toggle money on fire, delete) — "left/right" semantics keep working because stages still have an array order.
-- Active state: ring + slight scale-up; inactive when another is selected: dim to 55% (mirrors current `dim` behavior).
-- Money-on-fire ring stays via the existing `ValueTag` wrapper.
+- **Move labels outside the node**: nodes become smaller emoji-only discs (~72px). Title, numeral, and value tag render *outside* the disc, positioned radially (above for top half, below for bottom half, left/right for sides) so each label has room to breathe across 2 lines without truncation.
+- **Larger ring container**: increase max width from 640px → 760px so labels around the perimeter don't collide with the page edges; keep `aspect-square` so it still fits one screen.
+- **Subtitle preview on hover**: small tooltip on the node shows the subtitle (currently only visible after selecting). No layout cost.
 
-Subtitle is dropped from the ring node (no room); it remains visible/editable in the magazine spread below.
+## 3. Make editing not fiddly
 
-## Click behavior
-
-- Clicking a node toggles `selectedStageId` exactly like today.
-- The magazine spread (`What Exists Today` / `What Doesn't Exist Today`, feature column, ValueTag, money-on-fire button) renders unchanged below the ring.
-- Collapse button in the spread still clears selection.
+- **Nodes become click-to-select only**. Remove inline `EditableText` for emoji and title from the ring node. The only interactive element on a node is "select this stage"; the dropdown menu (⋯) stays for reorder/delete/insert.
+- **All editing happens in the magazine spread below**, which already has roomy `EditableText` for emoji, title, subtitle, and the value-tag picker. This matches the mental model: ring = navigation, spread = editing.
+- **Hover affordance**: node lifts slightly + ring cursor becomes pointer; tooltip says "Open stage".
 
 ## Files
 
-- New: `src/components/journey/StageLifecycle.tsx` — SVG ring + arc connectors + arrowheads + HTML node overlay. Pure presentational; receives `stages`, `selectedStageId`, `valueTags`, `showMoneyOnFire`, and the same callbacks `StageCard` uses today (`onSelect`, `onRename`, `onValueChange`, `onToggleOnFire`, `onManageValueTags`, `onMove`, `onInsertAfter`, `onDelete`).
-- Edit: `src/components/journey/JourneyMap.tsx`
-  - Remove `stripRef`, `scrollStrip`, the two scroll arrow buttons, the `<ol>` strip, and the inline `StageCard` component.
-  - Replace that whole `<section>` body with `<StageLifecycle ... />`.
-  - Keep the "Add stage" toolbar button; add-stage still appends to the array, which simply adds another node to the ring.
-  - Empty-state copy ("Select a stage above…") updated to "Select a stage in the ring to read its details."
-
-No changes to `journey-data.ts`, `journey-store.ts`, `LineRow.tsx`, `LineListCard.tsx`, `TagManagerDialog.tsx`, `TagPicker.tsx`, or persisted data shape.
-
-## Responsiveness
-
-- Ring is `aspect-square` with `width: min(100%, 640px)` and centered.
-- Node size and font shrink slightly at <480px (e.g. 96px nodes) so 8–10 stages still fit without overlap. If stage count exceeds ~12, nodes scale down further proportionally (`nodeSize = clamp(72, ringRadius * sin(π/n) * 1.6, 132)`).
+- Edit `src/components/journey/StageLifecycle.tsx`
+  - Drop `EditableText` and `TagPicker` from `StageNode`; node becomes a plain emoji disc + hover tooltip + dropdown menu.
+  - Compute radial label position per stage (angle → `top/right/bottom/left` placement) and render label block absolutely positioned outside the disc.
+  - Add `Start` marker at angle `-π/2` outside the ring.
+  - Add numbered badge SVG `<g>` at each arc midpoint.
+  - Highlight the arc whose target index === selected stage.
+  - Bump container `max-w-[760px]` and adjust `ringRadius` math.
+- No edits to `JourneyMap.tsx`, store, or data — props stay the same; the unused `onRename` / `onValueChange` / `onManageValueTags` props on `StageLifecycle` remain accepted but become no-ops on the node (still used by the spread).
 
 ## Out of scope
 
-- Drag-to-reorder around the ring (Move left/right in the menu still works).
-- Animated arc transitions.
-- Changing the detail spread, tags, value tags, or persistence.
+- Different layout shapes (horizontal flow, timeline) — you chose to keep the circle.
+- Drag-to-reorder around the ring (menu still has Move back / Move forward).
+- Animating the active-arc highlight.
