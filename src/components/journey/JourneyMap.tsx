@@ -10,6 +10,7 @@ import {
   RotateCcw,
   X,
   Layers,
+  Flame,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,7 @@ export function JourneyMap() {
   const fileRef = useRef<HTMLInputElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
 
   const sentimentLens =
     j.doc.lenses.find((l) => l.name.toLowerCase() === "sentiment") ?? j.doc.lenses[0];
@@ -117,6 +119,25 @@ export function JourneyMap() {
               {tool(<RotateCcw className="h-4 w-4" />, "Reset to defaults", () => {
                 if (confirm("Reset to default content? Your edits will be lost.")) j.reset();
               })}
+              <span className="mx-1 h-5 w-px bg-border" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowMoneyOnFire((v) => !v)}
+                    aria-pressed={showMoneyOnFire}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-medium border transition",
+                      showMoneyOnFire
+                        ? "bg-destructive text-destructive-foreground border-destructive shadow-sm"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary",
+                    )}
+                  >
+                    <Flame className="h-3.5 w-3.5" />
+                    Money on fire
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Highlight stages losing money</TooltipContent>
+              </Tooltip>
               <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImport} />
             </div>
           </div>
@@ -152,6 +173,7 @@ export function JourneyMap() {
                     const sentiment = parseSentiment(sentimentText ?? "");
                     const active = s.id === selectedStageId;
                     const dim = selectedStageId && !active;
+                    const onFire = showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(i);
                     return (
                       <li
                         key={s.id}
@@ -163,6 +185,7 @@ export function JourneyMap() {
                           active={active}
                           dim={!!dim}
                           sentiment={sentiment}
+                          onFire={onFire}
                           onSelect={() =>
                             setSelectedStageId((cur) => (cur === s.id ? null : s.id))
                           }
@@ -215,6 +238,12 @@ export function JourneyMap() {
                         <span className="text-sm">{selectedSentiment.emoji}</span>
                         {selectedSentiment.label}
                       </span>
+                    )}
+                    {selectedStage.value && (
+                      <ValueTag
+                        value={selectedStage.value}
+                        onFire={showMoneyOnFire && MONEY_ON_FIRE_INDEXES.has(selectedIndex)}
+                      />
                     )}
                   </div>
                   <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight">
