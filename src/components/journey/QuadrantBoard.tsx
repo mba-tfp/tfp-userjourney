@@ -344,113 +344,135 @@ function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
-// ---------- Iso floor + axis labels ----------
+// ---------- 2D grid, quadrant labels, axis labels ----------
 
-function IsoFloor() {
-  // 5×5 grid of tiles; draw lines at impact = 1..5 and urgency = 1..5.
+function Grid() {
   const lines: ReactElement[] = [];
-  for (let i = 1; i <= 5; i++) {
-    const a = project(i, 1, 1);
-    const b = project(i, 5, 1);
+  for (let i = 0; i <= 4; i++) {
+    const x = PAD_L + (i / 4) * PLOT_W;
+    const y = PAD_T + (i / 4) * PLOT_H;
+    const edge = i === 0 || i === 4;
     lines.push(
       <line
-        key={`iL${i}`}
-        x1={a.x}
-        y1={a.y}
-        x2={b.x}
-        y2={b.y}
+        key={`v${i}`}
+        x1={x}
+        y1={PAD_T}
+        x2={x}
+        y2={PAD_T + PLOT_H}
         stroke="hsl(var(--border))"
-        strokeOpacity={i === 1 || i === 5 ? 0.9 : 0.45}
-        strokeWidth={i === 1 || i === 5 ? 1.2 : 1}
+        strokeOpacity={edge ? 0.9 : 0.3}
+      />,
+      <line
+        key={`h${i}`}
+        x1={PAD_L}
+        y1={y}
+        x2={PAD_L + PLOT_W}
+        y2={y}
+        stroke="hsl(var(--border))"
+        strokeOpacity={edge ? 0.9 : 0.3}
       />,
     );
   }
-  for (let u = 1; u <= 5; u++) {
-    const a = project(1, u, 1);
-    const b = project(5, u, 1);
-    lines.push(
-      <line
-        key={`uL${u}`}
-        x1={a.x}
-        y1={a.y}
-        x2={b.x}
-        y2={b.y}
-        stroke="hsl(var(--border))"
-        strokeOpacity={u === 1 || u === 5 ? 0.9 : 0.45}
-        strokeWidth={u === 1 || u === 5 ? 1.2 : 1}
-      />,
-    );
-  }
-  // Diamond fill
-  const c1 = project(1, 1, 1);
-  const c2 = project(5, 1, 1);
-  const c3 = project(5, 5, 1);
-  const c4 = project(1, 5, 1);
-  // Effort top diamond (e=5) — faint outline to suggest depth.
-  const t1 = project(1, 1, 5);
-  const t2 = project(5, 1, 5);
-  const t3 = project(5, 5, 5);
-  const t4 = project(1, 5, 5);
+  // Midline crosshair (emphasis)
+  const midX = PAD_L + PLOT_W / 2;
+  const midY = PAD_T + PLOT_H / 2;
+  lines.push(
+    <line
+      key="midV"
+      x1={midX}
+      y1={PAD_T}
+      x2={midX}
+      y2={PAD_T + PLOT_H}
+      stroke="hsl(var(--foreground))"
+      strokeOpacity="0.35"
+      strokeWidth="1"
+    />,
+    <line
+      key="midH"
+      x1={PAD_L}
+      y1={midY}
+      x2={PAD_L + PLOT_W}
+      y2={midY}
+      stroke="hsl(var(--foreground))"
+      strokeOpacity="0.35"
+      strokeWidth="1"
+    />,
+  );
+  return <g>{lines}</g>;
+}
+
+function QuadrantLabels() {
+  const x1 = PAD_L + PLOT_W * 0.25;
+  const x2 = PAD_L + PLOT_W * 0.75;
+  const y1 = PAD_T + PLOT_H * 0.25;
+  const y2 = PAD_T + PLOT_H * 0.75;
+  const items: { x: number; y: number; label: string; sub: string }[] = [
+    { x: x1, y: y1, label: "Big Bets", sub: "high impact · low urgency" },
+    { x: x2, y: y1, label: "Quick Wins", sub: "high impact · high urgency" },
+    { x: x1, y: y2, label: "Time Sinks", sub: "low impact · low urgency" },
+    { x: x2, y: y2, label: "Fill-ins", sub: "low impact · high urgency" },
+  ];
   return (
-    <g>
-      <polygon
-        points={`${c1.x},${c1.y} ${c2.x},${c2.y} ${c3.x},${c3.y} ${c4.x},${c4.y}`}
-        fill="url(#floor)"
-      />
-      {lines}
-      {/* Vertical edges at the four corners */}
-      {[c1, c2, c3, c4].map((c, idx) => {
-        const t = [t1, t2, t3, t4][idx];
-        return (
-          <line
-            key={`v${idx}`}
-            x1={c.x}
-            y1={c.y}
-            x2={t.x}
-            y2={t.y}
-            stroke="hsl(var(--border))"
-            strokeOpacity="0.4"
-            strokeDasharray="3 4"
-          />
-        );
-      })}
-      {/* Top outline of the effort cube */}
-      <polygon
-        points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`}
-        fill="none"
-        stroke="hsl(var(--border))"
-        strokeOpacity="0.35"
-        strokeDasharray="3 4"
-      />
+    <g className="fill-muted-foreground" textAnchor="middle">
+      {items.map((it) => (
+        <g key={it.label}>
+          <text
+            x={it.x}
+            y={it.y}
+            fontSize="13"
+            fontWeight="700"
+            opacity="0.45"
+            className="fill-foreground uppercase tracking-[0.18em]"
+          >
+            {it.label}
+          </text>
+          <text x={it.x} y={it.y + 14} fontSize="10" opacity="0.6">
+            {it.sub}
+          </text>
+        </g>
+      ))}
     </g>
   );
 }
 
 function AxisLabels() {
-  const impactLow = project(1, 5, 1);
-  const impactHigh = project(5, 5, 1);
-  const urgencyLow = project(5, 1, 1);
-  const urgencyHigh = project(5, 5, 1);
-  const effortTop = project(5, 1, 5);
   return (
     <g className="fill-muted-foreground" fontSize="11" fontWeight="600">
-      {/* Impact axis along the front-left edge */}
-      <text x={impactLow.x - 8} y={impactLow.y + 24} textAnchor="end">
-        Low Impact
+      {/* Y axis: Impact */}
+      <text
+        x={PAD_L - 14}
+        y={PAD_T + PLOT_H / 2}
+        textAnchor="middle"
+        transform={`rotate(-90 ${PAD_L - 14} ${PAD_T + PLOT_H / 2})`}
+        className="uppercase tracking-[0.18em]"
+      >
+        Impact →
       </text>
-      <text x={impactHigh.x + 8} y={impactHigh.y + 24}>
-        High Impact →
+      <text x={PAD_L - 10} y={PAD_T + 4} textAnchor="end" fontSize="10">
+        High
       </text>
-      {/* Urgency axis along the front-right edge */}
-      <text x={urgencyLow.x + 8} y={urgencyLow.y + 6}>
-        Low Urgency
+      <text x={PAD_L - 10} y={PAD_T + PLOT_H} textAnchor="end" fontSize="10">
+        Low
       </text>
-      <text x={urgencyHigh.x + 8} y={urgencyHigh.y + 18}>
-        High Urgency →
+      {/* X axis: Urgency */}
+      <text
+        x={PAD_L + PLOT_W / 2}
+        y={VIEW_H - 18}
+        textAnchor="middle"
+        className="uppercase tracking-[0.18em]"
+      >
+        Urgency →
       </text>
-      {/* Effort axis (vertical) */}
-      <text x={effortTop.x + 10} y={effortTop.y - 4}>
-        ↑ High Effort
+      <text x={PAD_L} y={PAD_T + PLOT_H + 16} fontSize="10">
+        Low
+      </text>
+      <text
+        x={PAD_L + PLOT_W}
+        y={PAD_T + PLOT_H + 16}
+        textAnchor="end"
+        fontSize="10"
+      >
+        High
       </text>
     </g>
   );
