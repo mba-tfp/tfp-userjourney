@@ -7,75 +7,11 @@ import {
   type Line,
   type Stage,
   type Tag,
-  TAG_COLORS,
 } from "./journey-data";
 
 const KEY = "otto-journey-doc-v3";
 const KEY_V2 = "otto-journey-doc-v2";
 const LEGACY_KEY = "otto-journey-doc-v1";
-
-// Migrate a legacy v1 doc (lenses + cells) to v2 (tags + lines)
-function migrateV1(legacy: any): JourneyDoc {
-  const lensList: { id: string; name: string }[] = legacy?.lenses ?? [];
-  const cells: Record<string, Record<string, { lines: { text: string; gap?: boolean }[] }>> =
-    legacy?.cells ?? {};
-
-  // Drop legacy Sentiment lens entirely
-  const activeLenses = lensList.filter((l) => l.name.toLowerCase() !== "sentiment");
-
-  // Map lens name -> seed tag id when names match, else create a new tag
-  const tags: Tag[] = [...seedDoc.tags];
-  const tagByLensId: Record<string, string> = {};
-  const palette = TAG_COLORS;
-  activeLenses.forEach((lens, i) => {
-    const existing = tags.find((t) => t.name.toLowerCase() === lens.name.toLowerCase());
-    if (existing) {
-      tagByLensId[lens.id] = existing.id;
-    } else {
-      const t: Tag = { id: newId("t"), name: lens.name, color: palette[(tags.length + i) % palette.length] };
-      tags.push(t);
-      tagByLensId[lens.id] = t.id;
-    }
-  });
-
-  const stages: Stage[] = (legacy?.stages ?? []).map((s: any, i: number) => ({
-    id: s.id,
-    emoji: s.emoji,
-    title: s.title,
-    subtitle: s.subtitle,
-    valueTagId:
-      (s?.value && VALUE_TAG_IDS[s.value as keyof typeof VALUE_TAG_IDS]) ||
-      seedDoc.stages[i]?.valueTagId,
-    onFire: seedDoc.stages[i]?.onFire ?? false,
-  }));
-
-  const lines: Record<string, Line[]> = {};
-  stages.forEach((stage) => {
-    const stageLines: Line[] = [];
-    let counter = 1;
-    activeLenses.forEach((lens) => {
-      const cell = cells[lens.id]?.[stage.id];
-      (cell?.lines ?? []).forEach((sl) => {
-        if (!sl.text?.trim()) return;
-        stageLines.push({
-          id: `${stage.id}-ln-${counter++}`,
-          text: sl.text.replace(/^✗\s+/, ""),
-          tagId: tagByLensId[lens.id],
-          exists: !sl.gap,
-        });
-      });
-    });
-    lines[stage.id] = stageLines;
-  });
-
-  return {
-    title: legacy?.title ?? seedDoc.title,
-    stages,
-    tags,
-    valueTags: seedDoc.valueTags,
-    lines,
-  };
-}
 
 // v2 docs stored stage.value as "capacity" | "revenue" | "cost" and had no valueTags/onFire
 function migrateV2(v2: any): JourneyDoc {
@@ -116,13 +52,8 @@ function load(): JourneyDoc {
       localStorage.setItem(KEY, JSON.stringify(migrated));
       return migrated;
     }
-    // One-shot migrate from v1
-    const legacyRaw = localStorage.getItem(LEGACY_KEY);
-    if (legacyRaw) {
-      const migrated = migrateV1(JSON.parse(legacyRaw));
-      localStorage.setItem(KEY, JSON.stringify(migrated));
-      return migrated;
-    }
+    // v1 legacy storage no longer migrated; clean up if present
+    if (localStorage.getItem(LEGACY_KEY)) localStorage.removeItem(LEGACY_KEY);
     return seedDoc;
   } catch {
     return seedDoc;
