@@ -407,10 +407,12 @@ function truncate(s: string, n: number) {
 
 function Grid() {
   const lines: ReactElement[] = [];
-  for (let i = 0; i <= 4; i++) {
-    const x = PAD_L + (i / 4) * PLOT_W;
-    const y = PAD_T + (i / 4) * PLOT_H;
-    const edge = i === 0 || i === 4;
+  const STEPS = 10;
+  for (let i = 0; i <= STEPS; i++) {
+    const x = PAD_L + (i / STEPS) * PLOT_W;
+    const y = PAD_T + (i / STEPS) * PLOT_H;
+    const edge = i === 0 || i === STEPS;
+    const mid = i === STEPS / 2;
     lines.push(
       <line
         key={`v${i}`}
@@ -419,7 +421,7 @@ function Grid() {
         x2={x}
         y2={PAD_T + PLOT_H}
         stroke="hsl(var(--border))"
-        strokeOpacity={edge ? 0.9 : 0.3}
+        strokeOpacity={edge ? 0.9 : mid ? 0.45 : 0.2}
       />,
       <line
         key={`h${i}`}
@@ -428,84 +430,26 @@ function Grid() {
         x2={PAD_L + PLOT_W}
         y2={y}
         stroke="hsl(var(--border))"
-        strokeOpacity={edge ? 0.9 : 0.3}
+        strokeOpacity={edge ? 0.9 : mid ? 0.45 : 0.2}
       />,
     );
   }
-  // Midline crosshair (emphasis)
-  const midX = PAD_L + PLOT_W / 2;
-  const midY = PAD_T + PLOT_H / 2;
-  lines.push(
-    <line
-      key="midV"
-      x1={midX}
-      y1={PAD_T}
-      x2={midX}
-      y2={PAD_T + PLOT_H}
-      stroke="hsl(var(--foreground))"
-      strokeOpacity="0.35"
-      strokeWidth="1"
-    />,
-    <line
-      key="midH"
-      x1={PAD_L}
-      y1={midY}
-      x2={PAD_L + PLOT_W}
-      y2={midY}
-      stroke="hsl(var(--foreground))"
-      strokeOpacity="0.35"
-      strokeWidth="1"
-    />,
-  );
   return <g>{lines}</g>;
 }
 
-function QuadrantLabels() {
-  const x1 = PAD_L + PLOT_W * 0.25;
-  const x2 = PAD_L + PLOT_W * 0.75;
-  const y1 = PAD_T + PLOT_H * 0.25;
-  const y2 = PAD_T + PLOT_H * 0.75;
-  const items: { x: number; y: number; label: string; sub: string }[] = [
-    { x: x1, y: y1, label: "Big Bets", sub: "high impact · low urgency" },
-    { x: x2, y: y1, label: "Quick Wins", sub: "high impact · high urgency" },
-    { x: x1, y: y2, label: "Time Sinks", sub: "low impact · low urgency" },
-    { x: x2, y: y2, label: "Fill-ins", sub: "low impact · high urgency" },
-  ];
-  return (
-    <g className="fill-muted-foreground" textAnchor="middle">
-      {items.map((it) => (
-        <g key={it.label}>
-          <text
-            x={it.x}
-            y={it.y}
-            fontSize="13"
-            fontWeight="700"
-            opacity="0.45"
-            className="fill-foreground uppercase tracking-[0.18em]"
-          >
-            {it.label}
-          </text>
-          <text x={it.x} y={it.y + 14} fontSize="10" opacity="0.6">
-            {it.sub}
-          </text>
-        </g>
-      ))}
-    </g>
-  );
-}
-
 function AxisLabels() {
+  const midY = PAD_T + PLOT_H / 2;
   return (
     <g className="fill-muted-foreground" fontSize="11" fontWeight="600">
-      {/* Y axis: Impact */}
+      {/* Left axis: Urgency */}
       <text
         x={PAD_L - 14}
-        y={PAD_T + PLOT_H / 2}
+        y={midY}
         textAnchor="middle"
-        transform={`rotate(-90 ${PAD_L - 14} ${PAD_T + PLOT_H / 2})`}
+        transform={`rotate(-90 ${PAD_L - 14} ${midY})`}
         className="uppercase tracking-[0.18em]"
       >
-        Impact →
+        Urgency →
       </text>
       <text x={PAD_L - 10} y={PAD_T + 4} textAnchor="end" fontSize="10">
         High
@@ -513,14 +457,30 @@ function AxisLabels() {
       <text x={PAD_L - 10} y={PAD_T + PLOT_H} textAnchor="end" fontSize="10">
         Low
       </text>
-      {/* X axis: Urgency */}
+      {/* Right axis: Impact */}
+      <text
+        x={PAD_L + PLOT_W + 14}
+        y={midY}
+        textAnchor="middle"
+        transform={`rotate(90 ${PAD_L + PLOT_W + 14} ${midY})`}
+        className="uppercase tracking-[0.18em]"
+      >
+        Impact →
+      </text>
+      <text x={PAD_L + PLOT_W + 10} y={PAD_T + 4} fontSize="10">
+        High
+      </text>
+      <text x={PAD_L + PLOT_W + 10} y={PAD_T + PLOT_H} fontSize="10">
+        Low
+      </text>
+      {/* X axis: Effort */}
       <text
         x={PAD_L + PLOT_W / 2}
         y={VIEW_H - 18}
         textAnchor="middle"
         className="uppercase tracking-[0.18em]"
       >
-        Urgency →
+        Effort →
       </text>
       <text x={PAD_L} y={PAD_T + PLOT_H + 16} fontSize="10">
         Low
