@@ -56,7 +56,13 @@ function normalize(raw: any): JourneyDoc {
   const isBucketTag = (id: string) => existsTagIds.has(id) || gapTagIds.has(id);
 
   const lines: Record<string, Line[]> = {};
+  const onFireById = new Map(stages.map((s) => [s.id, !!s.onFire]));
+  const clampScore = (n: unknown, fallback: number) => {
+    const v = typeof n === "number" && Number.isFinite(n) ? Math.round(n) : fallback;
+    return Math.max(1, Math.min(5, v));
+  };
   for (const [sid, arr] of Object.entries((raw?.lines ?? {}) as Record<string, any[]>)) {
+    const onFire = onFireById.get(sid) ?? false;
     lines[sid] = (arr ?? []).map((l: any) => {
       const rawIds: string[] = Array.isArray(l.tagIds)
         ? l.tagIds.filter(Boolean)
@@ -66,11 +72,17 @@ function normalize(raw: any): JourneyDoc {
       let exists = !!l.exists;
       if (rawIds.some((id) => gapTagIds.has(id))) exists = false;
       else if (rawIds.some((id) => existsTagIds.has(id))) exists = true;
+      // Seed scores from signals when missing.
+      const seedUrgency = !exists ? (onFire ? 4 : 3) : 2;
+      const seedImpact = onFire ? 4 : 3;
       return {
         id: l.id,
         text: l.text ?? "",
         exists,
         tagIds: rawIds.filter((id) => !isBucketTag(id)),
+        impact: clampScore(l.impact, seedImpact),
+        urgency: clampScore(l.urgency, seedUrgency),
+        effort: clampScore(l.effort, 3),
       };
     });
   }
@@ -317,6 +329,26 @@ export function useJourney() {
       update((d) => {
         if (!d.lines[stageId]) return d;
         d.lines[stageId] = d.lines[stageId].filter((l) => l.id !== lineId);
+        return d;
+      }),
+    setLineScores: (
+      stageId: string,
+      lineId: string,
+      patch: { impact?: number; urgency?: number; effort?: number },
+    ) =>
+      update((d) => {
+        const arr = d.lines[stageId];
+        if (!arr) return d;
+        const i = arr.findIndex((l) => l.id === lineId);
+        if (i < 0) return d;
+        const clamp = (n: number) => Math.max(1, Math.min(5, Math.round(n)));
+        const cur = arr[i];
+        arr[i] = {
+          ...cur,
+          impact: typeof patch.impact === "number" ? clamp(patch.impact) : cur.impact,
+          urgency: typeof patch.urgency === "number" ? clamp(patch.urgency) : cur.urgency,
+          effort: typeof patch.effort === "number" ? clamp(patch.effort) : cur.effort,
+        };
         return d;
       }),
     moveLine: (stageId: string, lineId: string, dir: -1 | 1) =>
