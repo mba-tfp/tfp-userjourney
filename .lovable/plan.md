@@ -1,39 +1,48 @@
-# Make the Lifecycle Ring Readable
+## Cleanup (dead weight)
 
-Keep the circular lifecycle layout but fix the three issues you flagged: stage order is hard to read, labels are cramped, and editing inside nodes is fiddly.
+- Delete `src/lib/api/example.functions.ts`, `src/lib/api/` folder, and `src/lib/config.server.ts` (unused template boilerplate).
+- Remove unused `ChevronLeft`, `ChevronRight` imports from `JourneyMap.tsx`.
+- Remove the stale `{/* Stage strip */}` comment.
+- Remove the redundant "Begin" empty-state card at the bottom of `JourneyMap.tsx` (center summary already prompts the user).
+- Remove the decorative footer ("Auto-saved locally · Click any text to edit").
+- Drop the v1 migration path (`migrateV1`, `LEGACY_KEY`) from `journey-store.ts`. Keep v2 migration for one release.
 
-## 1. Make order obvious
+## Ring readability & duplication
 
-- **"Start here" marker**: render a small chip just outside the ring next to stage 01 (12 o'clock) with the label `Start` and a downward arrow pointing into the node. Persistent — not hover-only.
-- **Numbered arrows**: each connector arc gets a small numbered badge at its midpoint (`→ 2`, `→ 3`, …) so the reading order is explicit instead of inferred from clockwise direction.
-- **Stronger clockwise cue**: thicken the connector arcs (1.5 → 2.5px), darken from `--border` to `--muted-foreground` at 40%, enlarge arrowheads ~50%.
-- **Active-stage highlight on the path**: when a stage is selected, the arc *leading into* it gets `--primary` color so you can see "you are here" within the flow.
+- When a stage is selected, slim the center summary to just `STAGE 02 / 11` + value-tag dot/name. The big title/subtitle stay only in the magazine spread below — no duplication.
+- Center summary keeps the full "Select a stage" copy when nothing is selected.
+- Add an empty-stage cue: nodes whose stage has zero lines render with a dashed border + reduced opacity so gaps are visible at a glance.
+- Add a placeholder outline dot when a stage has no value tag, so the visual slot is consistent.
 
-## 2. Fix cramped labels
+## Accessibility
 
-- **Move labels outside the node**: nodes become smaller emoji-only discs (~72px). Title, numeral, and value tag render *outside* the disc, positioned radially (above for top half, below for bottom half, left/right for sides) so each label has room to breathe across 2 lines without truncation.
-- **Larger ring container**: increase max width from 640px → 760px so labels around the perimeter don't collide with the page edges; keep `aspect-square` so it still fits one screen.
-- **Subtitle preview on hover**: small tooltip on the node shows the subtitle (currently only visible after selecting). No layout cost.
+- Convert `StageNode` from a `role="button"` div to a real `<button>` with `aria-label`, `aria-pressed={active}`, native focus ring (`focus-visible:ring-2 ring-foreground/60`), and `tabIndex` in DOM order.
+- Add keyboard navigation on the ring container: `←/→` cycle selection, `Home`/`End` jump to first/last, `Enter`/`Space` toggle, `Esc` deselect.
+- Wrap the page body in a single `<main>` inside `JourneyMap.tsx` (currently no landmark).
+- Ensure icon-only header tool buttons already have `aria-label` (they do via the `tool()` helper — verify).
+- Swap `min-h-screen` for `min-h-dvh` on the root container.
 
-## 3. Make editing not fiddly
+## Mobile
 
-- **Nodes become click-to-select only**. Remove inline `EditableText` for emoji and title from the ring node. The only interactive element on a node is "select this stage"; the dropdown menu (⋯) stays for reorder/delete/insert.
-- **All editing happens in the magazine spread below**, which already has roomy `EditableText` for emoji, title, subtitle, and the value-tag picker. This matches the mental model: ring = navigation, spread = editing.
-- **Hover affordance**: node lifts slightly + ring cursor becomes pointer; tooltip says "Open stage".
+- Make the ring responsive: `max-w-[min(680px,90vw)]` and scale label font down one step under `sm:`.
+- On viewports < 640px, hide stage labels around the ring and rely on the center summary + node numbers (labels reflow into a list below the ring).
 
-## Files
+## Small features
 
-- Edit `src/components/journey/StageLifecycle.tsx`
-  - Drop `EditableText` and `TagPicker` from `StageNode`; node becomes a plain emoji disc + hover tooltip + dropdown menu.
-  - Compute radial label position per stage (angle → `top/right/bottom/left` placement) and render label block absolutely positioned outside the disc.
-  - Add `Start` marker at angle `-π/2` outside the ring.
-  - Add numbered badge SVG `<g>` at each arc midpoint.
-  - Highlight the arc whose target index === selected stage.
-  - Bump container `max-w-[760px]` and adjust `ringRadius` math.
-- No edits to `JourneyMap.tsx`, store, or data — props stay the same; the unused `onRename` / `onValueChange` / `onManageValueTags` props on `StageLifecycle` remain accepted but become no-ops on the node (still used by the spread).
+- Add a "Money on fire" counter next to the toolbar toggle: `Money on fire · 3/11` when any are flagged.
+- Add a stage-completeness counter to the center summary's idle state: `11 STAGES · 2 EMPTY`.
 
-## Out of scope
+## SSR hydration
 
-- Different layout shapes (horizontal flow, timeline) — you chose to keep the circle.
-- Drag-to-reorder around the ring (menu still has Move back / Move forward).
-- Animating the active-arc highlight.
+- Gate the first render on the `hydrated` flag from `useJourney()` so users don't see seed-then-swap. Render a minimal skeleton (header only) until hydrated.
+
+## Files touched
+
+- `src/components/journey/JourneyMap.tsx` — main, dvh, cleanup, fire counter, hydration gate.
+- `src/components/journey/StageLifecycle.tsx` — `<button>` nodes, keyboard nav, empty/no-tag cues, responsive sizing, slimmer center.
+- `src/lib/journey-store.ts` — drop v1 migration.
+- Delete: `src/lib/api/example.functions.ts`, `src/lib/api/`, `src/lib/config.server.ts`.
+
+## Out of scope (deferred)
+
+- Undo/redo, CSV/Markdown/PDF export, search across lines, og:image/favicon polish — flag-only.
