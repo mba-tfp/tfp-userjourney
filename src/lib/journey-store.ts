@@ -177,6 +177,17 @@ export function useJourney() {
         d.lines[stageId].push({ id: newId("ln"), text: "", exists, tagIds: [] });
         return d;
       }),
+    addLineInCell: (stageId: string, tagId: string | null) =>
+      update((d) => {
+        d.lines[stageId] = d.lines[stageId] ?? [];
+        d.lines[stageId].push({
+          id: newId("ln"),
+          text: "",
+          exists: true,
+          tagIds: tagId ? [tagId] : [],
+        });
+        return d;
+      }),
     updateLine: (stageId: string, lineId: string, patch: Partial<Line>) =>
       update((d) => {
         const arr = d.lines[stageId];
