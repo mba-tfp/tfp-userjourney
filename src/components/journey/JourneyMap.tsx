@@ -1,7 +1,5 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Download,
   Upload,
@@ -65,6 +63,28 @@ export function JourneyMap() {
   const existsLines = stageLines.filter((l) => l.exists);
   const gapLines = stageLines.filter((l) => !l.exists);
 
+  const lineCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const s of j.doc.stages) m[s.id] = (j.doc.lines[s.id] ?? []).length;
+    return m;
+  }, [j.doc.stages, j.doc.lines]);
+
+  const fireCount = useMemo(
+    () => j.doc.stages.reduce((acc, s) => acc + (s.onFire ? 1 : 0), 0),
+    [j.doc.stages],
+  );
+
+  if (!j.hydrated) {
+    return (
+      <div className="min-h-dvh bg-background text-foreground">
+        <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-6">
+          <div className="h-3 w-48 rounded bg-secondary animate-pulse" />
+          <div className="mt-3 h-9 w-96 max-w-full rounded bg-secondary animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(j.doc, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -105,7 +125,7 @@ export function JourneyMap() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="min-h-dvh bg-background text-foreground">
         {/* Masthead */}
         <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
           <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-6 flex items-start gap-6">
@@ -143,6 +163,18 @@ export function JourneyMap() {
                   >
                     <Flame className="h-3.5 w-3.5" />
                     Money on fire
+                    {fireCount > 0 && (
+                      <span
+                        className={cn(
+                          "ml-0.5 rounded-full px-1.5 text-[10px] font-bold tabular-nums",
+                          showMoneyOnFire
+                            ? "bg-destructive-foreground/15 text-destructive-foreground"
+                            : "bg-secondary text-foreground/80",
+                        )}
+                      >
+                        {fireCount}/{j.doc.stages.length}
+                      </span>
+                    )}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Highlight stages losing money</TooltipContent>
@@ -152,7 +184,7 @@ export function JourneyMap() {
           </div>
         </header>
 
-        {/* Stage strip */}
+        <main>
         {/* Stage lifecycle ring */}
         <section className="relative">
           <div className="mx-auto max-w-[1400px] px-6 pt-8 pb-10">
@@ -161,9 +193,11 @@ export function JourneyMap() {
               valueTags={j.doc.valueTags}
               selectedStageId={selectedStageId}
               showMoneyOnFire={showMoneyOnFire}
+              lineCounts={lineCounts}
               onSelect={(id) =>
                 setSelectedStageId((cur) => (cur === id ? null : id))
               }
+              onDeselect={() => setSelectedStageId(null)}
               onRename={(id, patch) => j.setStage(id, patch)}
               onValueChange={(id, valueTagId) => j.setStage(id, { valueTagId })}
               onToggleOnFire={(id) => j.toggleStageOnFire(id)}
@@ -177,6 +211,41 @@ export function JourneyMap() {
                 }
               }}
             />
+            {/* Mobile-only stage picker — labels are hidden around the ring under sm: */}
+            <div className="mt-6 sm:hidden">
+              <ol className="grid grid-cols-1 gap-1.5">
+                {j.doc.stages.map((s, i) => {
+                  const active = s.id === selectedStageId;
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedStageId((cur) => (cur === s.id ? null : s.id))
+                        }
+                        aria-pressed={active}
+                        className={cn(
+                          "w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition",
+                          active
+                            ? "border-foreground bg-secondary/60"
+                            : "border-border hover:bg-secondary/40",
+                        )}
+                      >
+                        <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span className="flex-1 truncate">{s.title}</span>
+                        {(lineCounts[s.id] ?? 0) === 0 && (
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                            empty
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
           </div>
         </section>
 
@@ -272,25 +341,7 @@ export function JourneyMap() {
           </section>
         )}
 
-        {!selectedStage && (
-          <div className="mx-auto max-w-[1400px] px-8 pb-16 pt-2">
-            <div className="rounded-2xl border border-dashed border-border bg-secondary/30 p-10 text-center">
-              <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-                Begin
-              </div>
-              <p className="mt-2 font-display text-2xl tracking-tight">
-                Select a stage above to read its lenses.
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Every text is editable. Changes auto-save in your browser.
-              </p>
-            </div>
-          </div>
-        )}
-
-        <footer className="border-t border-border px-8 py-8 text-center text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-          Auto-saved locally · Click any text to edit
-        </footer>
+        </main>
       </div>
       <TagManagerDialog
         open={tagManagerOpen}
