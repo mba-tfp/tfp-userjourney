@@ -147,6 +147,22 @@ export function useJourney() {
         [d.stages[i], d.stages[j]] = [d.stages[j], d.stages[i]];
         return d;
       }),
+    reorderStages: (nextOrder: string[]) =>
+      update((d) => {
+        const byId = new Map(d.stages.map((s) => [s.id, s]));
+        const seen = new Set<string>();
+        const ordered: Stage[] = [];
+        for (const id of nextOrder) {
+          const s = byId.get(id);
+          if (s && !seen.has(id)) {
+            ordered.push(s);
+            seen.add(id);
+          }
+        }
+        for (const s of d.stages) if (!seen.has(s.id)) ordered.push(s);
+        d.stages = ordered;
+        return d;
+      }),
     toggleStageOnFire: (id: string) =>
       update((d) => {
         const s = d.stages.find((s) => s.id === id);
@@ -159,6 +175,17 @@ export function useJourney() {
       update((d) => {
         d.lines[stageId] = d.lines[stageId] ?? [];
         d.lines[stageId].push({ id: newId("ln"), text: "", exists, tagIds: [] });
+        return d;
+      }),
+    addLineInCell: (stageId: string, tagId: string | null) =>
+      update((d) => {
+        d.lines[stageId] = d.lines[stageId] ?? [];
+        d.lines[stageId].push({
+          id: newId("ln"),
+          text: "",
+          exists: true,
+          tagIds: tagId ? [tagId] : [],
+        });
         return d;
       }),
     updateLine: (stageId: string, lineId: string, patch: Partial<Line>) =>
@@ -189,6 +216,40 @@ export function useJourney() {
         const j = i + dir;
         if (i < 0 || j < 0 || j >= arr.length) return d;
         [arr[i], arr[j]] = [arr[j], arr[i]];
+        return d;
+      }),
+    // Move a line across cells in the roadmap. If `fromTagId` and `toTagId`
+    // differ, the tag is swapped (other tags on the line are preserved).
+    // `toIndex` inserts at that position in the destination stage; omitted = end.
+    moveLineToCell: (args: {
+      fromStageId: string;
+      lineId: string;
+      toStageId: string;
+      fromTagId?: string | null;
+      toTagId?: string | null;
+      toIndex?: number;
+    }) =>
+      update((d) => {
+        const { fromStageId, lineId, toStageId, fromTagId, toTagId, toIndex } = args;
+        const src = d.lines[fromStageId];
+        if (!src) return d;
+        const idx = src.findIndex((l) => l.id === lineId);
+        if (idx < 0) return d;
+        const [line] = src.splice(idx, 1);
+        if (fromTagId && toTagId && fromTagId !== toTagId) {
+          const next = line.tagIds.filter((id) => id !== fromTagId);
+          if (!next.includes(toTagId)) next.push(toTagId);
+          line.tagIds = next;
+        } else if (!fromTagId && toTagId && !line.tagIds.includes(toTagId)) {
+          line.tagIds = [...line.tagIds, toTagId];
+        }
+        d.lines[toStageId] = d.lines[toStageId] ?? [];
+        const dst = d.lines[toStageId];
+        const insertAt =
+          toIndex === undefined || toIndex < 0 || toIndex > dst.length
+            ? dst.length
+            : toIndex;
+        dst.splice(insertAt, 0, line);
         return d;
       }),
 
