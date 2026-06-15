@@ -547,12 +547,12 @@ function Legend() {
         <span className="inline-block h-2 w-2 rounded-full align-middle bg-foreground mr-1.5" />
         Dot color = stage value tag
       </div>
-      <div>Larger dot = higher impact + urgency</div>
+      <div>Bubble size = Effort (bigger = more effort)</div>
       <div className="flex items-center gap-1.5">
         <Flame className="h-3 w-3 text-destructive" />
         Red ring = stage is "Money on fire"
       </div>
-      <div>Height of dot above floor = Effort</div>
+      <div>Top-right = Quick Wins · top-left = Big Bets</div>
     </div>
   );
 }
