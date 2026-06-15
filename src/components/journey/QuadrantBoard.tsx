@@ -564,14 +564,21 @@ function Legend() {
       </div>
       <div>
         <span className="inline-block h-2 w-2 rounded-full align-middle bg-foreground mr-1.5" />
-        Dot color = stage value tag
+        Color = stage value tag
       </div>
-      <div>Bubble size = Effort (bigger = more effort)</div>
+      <div>
+        <span className="inline-block h-2 w-2 rounded-full align-middle border border-foreground mr-1.5" />
+        Hollow = Urgency (left axis)
+      </div>
+      <div>
+        <span className="inline-block h-2 w-2 rounded-full align-middle bg-foreground mr-1.5" />
+        Filled = Impact (right axis)
+      </div>
+      <div>X position = Effort (low → high)</div>
       <div className="flex items-center gap-1.5">
         <Flame className="h-3 w-3 text-destructive" />
         Red ring = stage is "Money on fire"
       </div>
-      <div>Top-right = Quick Wins · top-left = Big Bets</div>
     </div>
   );
 }
