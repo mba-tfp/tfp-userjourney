@@ -8,7 +8,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
-import { TAG_DOT, TAG_PILL } from "./tag-colors";
+import { TAG_DOT } from "./tag-colors";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { SortableTagPill } from "./SortableTagPill";
 
 type Props = {
   tags: Tag[];
@@ -27,33 +43,48 @@ export function TagPicker({
   placeholder = "Tag",
   manageLabel = "Manage tags…",
 }: Props) {
-  const selected = tags.filter((t) => values.includes(t.id));
+  // Preserve the order stored in `values` (drag order), not the registry order.
+  const selected = values
+    .map((id) => tags.find((t) => t.id === id))
+    .filter((t): t is Tag => !!t);
   const toggle = (id: string) => {
-    onChange(values.includes(id) ? values.filter((v) => v !== id) : [...values, id]);
+    const next = values.includes(id)
+      ? values.filter((v) => v !== id)
+      : [...values, id];
+    onChange(Array.from(new Set(next)));
   };
   const remove = (id: string) => onChange(values.filter((v) => v !== id));
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIndex = values.indexOf(String(active.id));
+    const newIndex = values.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onChange(arrayMove(values, oldIndex, newIndex));
+  };
+
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      {selected.map((t) => (
-        <button
-          key={t.id}
-          data-no-toggle
-          type="button"
-          title={`Remove ${t.name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            remove(t.id);
-          }}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider transition shrink-0",
-            TAG_PILL[t.color as keyof typeof TAG_PILL] ?? TAG_PILL.slate,
-            "hover:opacity-80",
-          )}
+      {selected.length > 0 && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
         >
-          {t.name}
-        </button>
-      ))}
+          <SortableContext items={selected.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
+            <span className="inline-flex flex-wrap items-center gap-1">
+              {selected.map((t) => (
+                <SortableTagPill key={t.id} tag={t} onRemove={() => remove(t.id)} />
+              ))}
+            </span>
+          </SortableContext>
+        </DndContext>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
