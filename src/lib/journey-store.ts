@@ -331,6 +331,26 @@ export function useJourney() {
         d.lines[stageId] = d.lines[stageId].filter((l) => l.id !== lineId);
         return d;
       }),
+    setLineScores: (
+      stageId: string,
+      lineId: string,
+      patch: { impact?: number; urgency?: number; effort?: number },
+    ) =>
+      update((d) => {
+        const arr = d.lines[stageId];
+        if (!arr) return d;
+        const i = arr.findIndex((l) => l.id === lineId);
+        if (i < 0) return d;
+        const clamp = (n: number) => Math.max(1, Math.min(5, Math.round(n)));
+        const cur = arr[i];
+        arr[i] = {
+          ...cur,
+          impact: typeof patch.impact === "number" ? clamp(patch.impact) : cur.impact,
+          urgency: typeof patch.urgency === "number" ? clamp(patch.urgency) : cur.urgency,
+          effort: typeof patch.effort === "number" ? clamp(patch.effort) : cur.effort,
+        };
+        return d;
+      }),
     moveLine: (stageId: string, lineId: string, dir: -1 | 1) =>
       update((d) => {
         const arr = d.lines[stageId];
