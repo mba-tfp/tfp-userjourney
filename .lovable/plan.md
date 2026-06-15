@@ -1,48 +1,55 @@
-## Cleanup (dead weight)
+## Goal
 
-- Delete `src/lib/api/example.functions.ts`, `src/lib/api/` folder, and `src/lib/config.server.ts` (unused template boilerplate).
-- Remove unused `ChevronLeft`, `ChevronRight` imports from `JourneyMap.tsx`.
-- Remove the stale `{/* Stage strip */}` comment.
-- Remove the redundant "Begin" empty-state card at the bottom of `JourneyMap.tsx` (center summary already prompts the user).
-- Remove the decorative footer ("Auto-saved locally · Click any text to edit").
-- Drop the v1 migration path (`migrateV1`, `LEGACY_KEY`) from `journey-store.ts`. Keep v2 migration for one release.
+Replace the inline `TagManagerDialog` with a dedicated **/tags** management screen, add merge for duplicates, prevent duplicate tags on the same stage/line, and make tag pills drag-reorderable everywhere they appear.
 
-## Ring readability & duplication
+## 1. New route: `src/routes/tags.tsx`
 
-- When a stage is selected, slim the center summary to just `STAGE 02 / 11` + value-tag dot/name. The big title/subtitle stay only in the magazine spread below — no duplication.
-- Center summary keeps the full "Select a stage" copy when nothing is selected.
-- Add an empty-stage cue: nodes whose stage has zero lines render with a dashed border + reduced opacity so gaps are visible at a glance.
-- Add a placeholder outline dot when a stage has no value tag, so the visual slot is consistent.
+A real page (linked from the toolbar "Manage tags…" entry and from the `TagPicker` dropdown footer instead of opening a modal). Two sections — **Line tags** and **Value tags** — each a sortable list with the same row controls.
 
-## Accessibility
+Per-row controls:
+- Drag handle (reorder the registry — controls default display order everywhere)
+- Color swatch picker (existing `TAG_COLORS` palette)
+- Inline-editable name with **duplicate-name validation** (case-insensitive, trimmed) — invalid state shows a red border + inline message and the rename is rejected on blur/Enter
+- **Merge into…** dropdown — pick another tag in the same section; all references on lines/stages are rewritten to the target id (de-duped), then the source tag is deleted
+- Delete (existing behavior)
+- "Used in N lines / N stages" counter for context
 
-- Convert `StageNode` from a `role="button"` div to a real `<button>` with `aria-label`, `aria-pressed={active}`, native focus ring (`focus-visible:ring-2 ring-foreground/60`), and `tabIndex` in DOM order.
-- Add keyboard navigation on the ring container: `←/→` cycle selection, `Home`/`End` jump to first/last, `Enter`/`Space` toggle, `Esc` deselect.
-- Wrap the page body in a single `<main>` inside `JourneyMap.tsx` (currently no landmark).
-- Ensure icon-only header tool buttons already have `aria-label` (they do via the `tool()` helper — verify).
-- Swap `min-h-screen` for `min-h-dvh` on the root container.
+Header actions: "Add line tag", "Add value tag", and a back link to `/`.
 
-## Mobile
+## 2. Duplicate-tag validation on stages & lines
 
-- Make the ring responsive: `max-w-[min(680px,90vw)]` and scale label font down one step under `sm:`.
-- On viewports < 640px, hide stage labels around the ring and rely on the center summary + node numbers (labels reflow into a list below the ring).
+In `journey-store.ts`, change the tag-id setters so they always de-dupe:
+- When `Line.tagIds` or `Stage.valueTagIds` is updated, run `Array.from(new Set(ids))` before commit.
+- `TagPicker.onChange` already toggles, but add a defensive `Set` pass so paste/import/merge can't introduce dupes.
+- Surface a subtle toast ("Already tagged") only when the picker rejects a duplicate from a programmatic source (merge); the toggle UI itself silently no-ops.
 
-## Small features
+Tag-registry duplicate-name rule (separate from id-dedupe above) lives in the /tags screen as described in §1 — quick adds in `TagPicker` are unaffected (they only pick existing tags, never create).
 
-- Add a "Money on fire" counter next to the toolbar toggle: `Money on fire · 3/11` when any are flagged.
-- Add a stage-completeness counter to the center summary's idle state: `11 STAGES · 2 EMPTY`.
+## 3. Drag-and-drop reordering of tag pills
 
-## SSR hydration
+Install `@dnd-kit/core` + `@dnd-kit/sortable` + `@dnd-kit/utilities` (already a common shadcn-compatible pick; small footprint).
 
-- Gate the first render on the `hydrated` flag from `useJourney()` so users don't see seed-then-swap. Render a minimal skeleton (header only) until hydrated.
+Refactor `TagPicker` so the selected-pill row uses a `DndContext` + `SortableContext` (horizontal strategy). Dragging a pill reorders the `values: string[]` and calls `onChange(nextOrder)`. The `+` add button and dropdown stay outside the sortable list.
 
-## Files touched
+Because `Line.tagIds` / `Stage.valueTagIds` already preserve array order, reordering pills in any one place persists and is reflected wherever those tags render (LineRow, StageNode dots, center summary).
 
-- `src/components/journey/JourneyMap.tsx` — main, dvh, cleanup, fire counter, hydration gate.
-- `src/components/journey/StageLifecycle.tsx` — `<button>` nodes, keyboard nav, empty/no-tag cues, responsive sizing, slimmer center.
-- `src/lib/journey-store.ts` — drop v1 migration.
-- Delete: `src/lib/api/example.functions.ts`, `src/lib/api/`, `src/lib/config.server.ts`.
+The /tags screen reuses the same dnd-kit setup vertically to reorder the registry itself; that order is the default order used when a brand-new tag is added to a line/stage.
 
-## Out of scope (deferred)
+## 4. Wire-up changes
 
-- Undo/redo, CSV/Markdown/PDF export, search across lines, og:image/favicon polish — flag-only.
+- `JourneyMap.tsx`: replace `TagManagerDialog` mount + state with a `<Link to="/tags">` in the toolbar; remove the dialog import.
+- `TagPicker.tsx`: change `onManage` prop to navigate to `/tags` (keep the prop name; pass `() => navigate({ to: '/tags' })` from callers).
+- `LineRow.tsx`, `StageLifecycle.tsx`: no API change — they already pass through `tagIds` arrays; reordering "just works" once `TagPicker` is sortable.
+- Delete `TagManagerDialog.tsx` after the route is live.
+
+## 5. Out of scope
+
+- Multi-select bulk merge, tag groups/categories, server-side persistence (still localStorage v4 — no schema bump needed; ordering is already array-based).
+- Cross-section merge (line tag ↔ value tag).
+
+## Files
+
+- **Add:** `src/routes/tags.tsx`, small `src/components/journey/SortableTagPill.tsx` helper.
+- **Edit:** `src/lib/journey-store.ts` (de-dupe + `mergeTag` / `mergeValueTag` actions + `reorderTags` / `reorderValueTags`), `src/components/journey/TagPicker.tsx` (dnd-kit sortable pills, navigate on manage), `src/components/journey/JourneyMap.tsx` (drop dialog, add link).
+- **Delete:** `src/components/journey/TagManagerDialog.tsx`.
+- **Install:** `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
