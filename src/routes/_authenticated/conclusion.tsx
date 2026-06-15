@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Flame, Tag as TagIcon, LogOut, Undo2, Redo2 } from "lucide-react";
+import { ArrowLeft, Flame, Tag as TagIcon, LogOut, Undo2, Redo2, LayoutGrid } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useJourney } from "@/lib/journey-store";
 import { supabase } from "@/integrations/supabase/client";
@@ -108,6 +108,13 @@ function ConclusionPage() {
               className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition"
             >
               <TagIcon className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => navigate({ to: "/quadrant" })}
+              title="Priority quadrant"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition"
+            >
+              <LayoutGrid className="h-4 w-4" />
             </button>
             <button
               onClick={() => setShowMoneyOnFire((v) => !v)}
