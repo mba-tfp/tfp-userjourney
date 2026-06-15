@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -264,11 +264,10 @@ function SortableRow({
 
   const [draft, setDraft] = useState(tag.name);
   const [error, setError] = useState<string | null>(null);
-
-  // Reset draft when external tag name changes (e.g. after merge).
-  if (draft !== tag.name && error === null) {
-    // best-effort sync without effect dependency thrash
-  }
+  // Keep draft in sync when the tag name changes from elsewhere (rename commit, merge, etc.)
+  useEffect(() => {
+    setDraft(tag.name);
+  }, [tag.name]);
 
   const commit = () => {
     const trimmed = draft.trim();
