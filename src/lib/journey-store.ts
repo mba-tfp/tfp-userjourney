@@ -31,23 +31,61 @@ function normalize(raw: any): JourneyDoc {
       onFire: typeof s.onFire === "boolean" ? s.onFire : seedDoc.stages[i]?.onFire ?? false,
     };
   });
+  // Identify any legacy "exists today" / "doesn't exist today" tags and migrate
+  // their membership onto the line.exists boolean (bucket), then strip the tags.
+  const rawTags: any[] = Array.isArray(raw?.tags) ? raw.tags : seedDoc.tags;
+  const normName = (n: unknown) =>
+    String(n ?? "")
+      .toLowerCase()
+      .replace(/[’']/g, "'")
+      .replace(/\s+/g, " ")
+      .trim();
+  const EXISTS_NAMES = new Set(["what exists today", "exists today"]);
+  const GAP_NAMES = new Set([
+    "what doesn't exist today",
+    "doesn't exist today",
+    "what does not exist today",
+    "does not exist today",
+  ]);
+  const existsTagIds = new Set(
+    rawTags.filter((t) => EXISTS_NAMES.has(normName(t?.name))).map((t) => t.id),
+  );
+  const gapTagIds = new Set(
+    rawTags.filter((t) => GAP_NAMES.has(normName(t?.name))).map((t) => t.id),
+  );
+  const isBucketTag = (id: string) => existsTagIds.has(id) || gapTagIds.has(id);
+
   const lines: Record<string, Line[]> = {};
   for (const [sid, arr] of Object.entries((raw?.lines ?? {}) as Record<string, any[]>)) {
-    lines[sid] = (arr ?? []).map((l: any) => ({
-      id: l.id,
-      text: l.text ?? "",
-      exists: !!l.exists,
-      tagIds: Array.isArray(l.tagIds)
+    lines[sid] = (arr ?? []).map((l: any) => {
+      const rawIds: string[] = Array.isArray(l.tagIds)
         ? l.tagIds.filter(Boolean)
         : typeof l.tagId === "string"
           ? [l.tagId]
-          : [],
-    }));
+          : [];
+      let exists = !!l.exists;
+      if (rawIds.some((id) => gapTagIds.has(id))) exists = false;
+      else if (rawIds.some((id) => existsTagIds.has(id))) exists = true;
+      return {
+        id: l.id,
+        text: l.text ?? "",
+        exists,
+        tagIds: rawIds.filter((id) => !isBucketTag(id)),
+      };
+    });
   }
+  // Strip bucket tags from stage valueTagIds defensively, and from doc.tags.
+  const cleanedStages = stages.map((s) => ({
+    ...s,
+    valueTagIds: s.valueTagIds.filter((id) => !isBucketTag(id)),
+  }));
+  const cleanedTags: Tag[] = rawTags
+    .filter((t) => !isBucketTag(t.id))
+    .map((t) => ({ id: t.id, name: t.name, color: t.color }));
   return {
     title: raw?.title ?? seedDoc.title,
-    stages,
-    tags: raw?.tags ?? seedDoc.tags,
+    stages: cleanedStages,
+    tags: cleanedTags,
     valueTags: raw?.valueTags ?? seedDoc.valueTags,
     lines,
   };
