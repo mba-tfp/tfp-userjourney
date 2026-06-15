@@ -1,15 +1,14 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Plus,
-  Download,
-  Upload,
-  RotateCcw,
+  LogOut,
   X,
   Tag as TagIcon,
   Flame,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
 import { useJourney } from "@/lib/journey-store";
 import { EditableText } from "./EditableText";
 import { LineListCard } from "./LineListCard";
@@ -52,11 +51,14 @@ function ValueTag({
 
 export function JourneyMap() {
   const j = useJourney();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
   const navigate = useNavigate();
   const openTagManager = () => navigate({ to: "/tags" });
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  };
 
   const selectedStage = j.doc.stages.find((s) => s.id === selectedStageId) ?? null;
   const selectedIndex = selectedStage ? j.doc.stages.indexOf(selectedStage) : -1;
@@ -85,29 +87,6 @@ export function JourneyMap() {
       </div>
     );
   }
-
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(j.doc, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${j.doc.title.replace(/\s+/g, "-").toLowerCase()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      j.importDoc(JSON.parse(text));
-    } catch {
-      alert("Invalid JSON file");
-    } finally {
-      e.target.value = "";
-    }
-  };
 
   const tool = (icon: React.ReactNode, label: string, onClick: () => void) => (
     <Tooltip>
@@ -144,12 +123,6 @@ export function JourneyMap() {
               {tool(<TagIcon className="h-4 w-4" />, "Manage tags", openTagManager)}
               {tool(<Plus className="h-4 w-4" />, "Add stage", () => j.addStage())}
               <span className="mx-1 h-5 w-px bg-border" />
-              {tool(<Download className="h-4 w-4" />, "Export JSON", exportJson)}
-              {tool(<Upload className="h-4 w-4" />, "Import JSON", () => fileRef.current?.click())}
-              {tool(<RotateCcw className="h-4 w-4" />, "Reset to defaults", () => {
-                if (confirm("Reset to default content? Your edits will be lost.")) j.reset();
-              })}
-              <span className="mx-1 h-5 w-px bg-border" />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -180,7 +153,8 @@ export function JourneyMap() {
                 </TooltipTrigger>
                 <TooltipContent>Highlight stages losing money</TooltipContent>
               </Tooltip>
-              <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImport} />
+              <span className="mx-1 h-5 w-px bg-border" />
+              {tool(<LogOut className="h-4 w-4" />, "Sign out", signOut)}
             </div>
           </div>
         </header>
