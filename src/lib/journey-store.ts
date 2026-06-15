@@ -339,9 +339,11 @@ export function useJourney() {
       fromTagId?: string | null;
       toTagId?: string | null;
       toIndex?: number;
+      exists?: boolean;
     }) =>
       update((d) => {
-        const { fromStageId, lineId, toStageId, fromTagId, toTagId, toIndex } = args;
+        const { fromStageId, lineId, toStageId, fromTagId, toTagId, toIndex, exists } =
+          args;
         const src = d.lines[fromStageId];
         if (!src) return d;
         const idx = src.findIndex((l) => l.id === lineId);
@@ -354,6 +356,7 @@ export function useJourney() {
         } else if (!fromTagId && toTagId && !line.tagIds.includes(toTagId)) {
           line.tagIds = [...line.tagIds, toTagId];
         }
+        if (typeof exists === "boolean") line.exists = exists;
         d.lines[toStageId] = d.lines[toStageId] ?? [];
         const dst = d.lines[toStageId];
         const insertAt =
