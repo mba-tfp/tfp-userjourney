@@ -1,55 +1,40 @@
 ## Goal
 
-Replace the inline `TagManagerDialog` with a dedicated **/tags** management screen, add merge for duplicates, prevent duplicate tags on the same stage/line, and make tag pills drag-reorderable everywhere they appear.
+Persist each user's journey server-side so it survives browser clears and follows them across devices. Remove the Export / Import / Reset toolbar buttons that only exist because data lives in `localStorage`.
 
-## 1. New route: `src/routes/tags.tsx`
+## What changes for the user
 
-A real page (linked from the toolbar "Manage tags…" entry and from the `TagPicker` dropdown footer instead of opening a modal). Two sections — **Line tags** and **Value tags** — each a sortable list with the same row controls.
+- First visit prompts a login (email + password, no email confirmation so it's instant).
+- Their journey auto-saves to the cloud and reloads on any device.
+- The toolbar loses **Export JSON**, **Import JSON**, and **Reset to defaults**. A small "Sign out" control replaces them.
+- New users start from the same seeded demo journey they see today.
 
-Per-row controls:
-- Drag handle (reorder the registry — controls default display order everywhere)
-- Color swatch picker (existing `TAG_COLORS` palette)
-- Inline-editable name with **duplicate-name validation** (case-insensitive, trimmed) — invalid state shows a red border + inline message and the rename is rejected on blur/Enter
-- **Merge into…** dropdown — pick another tag in the same section; all references on lines/stages are rewritten to the target id (de-duped), then the source tag is deleted
-- Delete (existing behavior)
-- "Used in N lines / N stages" counter for context
+## Architecture
 
-Header actions: "Add line tag", "Add value tag", and a back link to `/`.
+1. **Enable Lovable Cloud** (Supabase under the hood — auth + Postgres).
+2. **Schema** — one row per user holding the whole journey as JSONB. Keeps the existing `JourneyDoc` shape; no schema churn when we add fields later.
 
-## 2. Duplicate-tag validation on stages & lines
+   ```sql
+   create table public.journeys (
+     user_id uuid primary key references auth.users(id) on delete cascade,
+     doc jsonb not null,
+     updated_at timestamptz not null default now()
+   );
+   -- grants + RLS so each user only sees their own row
+   ```
 
-In `journey-store.ts`, change the tag-id setters so they always de-dupe:
-- When `Line.tagIds` or `Stage.valueTagIds` is updated, run `Array.from(new Set(ids))` before commit.
-- `TagPicker.onChange` already toggles, but add a defensive `Set` pass so paste/import/merge can't introduce dupes.
-- Surface a subtle toast ("Already tagged") only when the picker rejects a duplicate from a programmatic source (merge); the toggle UI itself silently no-ops.
+3. **Auth gate** — wrap the app in the template's `_authenticated` layout; unauthenticated users land on `/auth` (email + password, auto-confirm).
+4. **Data layer** — replace `localStorage` in `src/lib/journey-store.ts` with:
+   - Initial load: `select doc from journeys where user_id = auth.uid()`. If missing, insert `seedDoc`.
+   - Saves: debounced (~600ms) `upsert` of the full doc. Same in-memory `useState` + `update()` ergonomics, so call sites (`JourneyMap`, `/tags`, etc.) don't change.
+5. **Toolbar cleanup** in `JourneyMap.tsx`: remove the three buttons, the hidden file input, and the `exportJson` / `onImport` / `reset` wiring. Add a "Sign out" icon button.
+6. **Keep `importDoc` / `reset` in the store** as internal helpers (used by initial hydration), but no UI surfaces them.
 
-Tag-registry duplicate-name rule (separate from id-dedupe above) lives in the /tags screen as described in §1 — quick adds in `TagPicker` are unaffected (they only pick existing tags, never create).
+## Out of scope
 
-## 3. Drag-and-drop reordering of tag pills
+- Sharing a journey with another user, multiple journeys per user, social login, password reset UI, migrating existing `localStorage` data into the cloud on first login (we'll just seed fresh — the demo content is identical).
 
-Install `@dnd-kit/core` + `@dnd-kit/sortable` + `@dnd-kit/utilities` (already a common shadcn-compatible pick; small footprint).
+## Files touched
 
-Refactor `TagPicker` so the selected-pill row uses a `DndContext` + `SortableContext` (horizontal strategy). Dragging a pill reorders the `values: string[]` and calls `onChange(nextOrder)`. The `+` add button and dropdown stay outside the sortable list.
-
-Because `Line.tagIds` / `Stage.valueTagIds` already preserve array order, reordering pills in any one place persists and is reflected wherever those tags render (LineRow, StageNode dots, center summary).
-
-The /tags screen reuses the same dnd-kit setup vertically to reorder the registry itself; that order is the default order used when a brand-new tag is added to a line/stage.
-
-## 4. Wire-up changes
-
-- `JourneyMap.tsx`: replace `TagManagerDialog` mount + state with a `<Link to="/tags">` in the toolbar; remove the dialog import.
-- `TagPicker.tsx`: change `onManage` prop to navigate to `/tags` (keep the prop name; pass `() => navigate({ to: '/tags' })` from callers).
-- `LineRow.tsx`, `StageLifecycle.tsx`: no API change — they already pass through `tagIds` arrays; reordering "just works" once `TagPicker` is sortable.
-- Delete `TagManagerDialog.tsx` after the route is live.
-
-## 5. Out of scope
-
-- Multi-select bulk merge, tag groups/categories, server-side persistence (still localStorage v4 — no schema bump needed; ordering is already array-based).
-- Cross-section merge (line tag ↔ value tag).
-
-## Files
-
-- **Add:** `src/routes/tags.tsx`, small `src/components/journey/SortableTagPill.tsx` helper.
-- **Edit:** `src/lib/journey-store.ts` (de-dupe + `mergeTag` / `mergeValueTag` actions + `reorderTags` / `reorderValueTags`), `src/components/journey/TagPicker.tsx` (dnd-kit sortable pills, navigate on manage), `src/components/journey/JourneyMap.tsx` (drop dialog, add link).
-- **Delete:** `src/components/journey/TagManagerDialog.tsx`.
-- **Install:** `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
+- New: `supabase/migrations/<timestamp>_journeys.sql`, `src/routes/auth.tsx` (if not already present from the auth template), minor wiring under `src/routes/_authenticated/`.
+- Edit: `src/lib/journey-store.ts` (swap persistence), `src/components/journey/JourneyMap.tsx` (toolbar), route files moved under `_authenticated` so the gate applies.
