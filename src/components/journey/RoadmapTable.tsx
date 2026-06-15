@@ -210,13 +210,7 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                   }
                   onDeleteLine={(stageId, lineId) => j.deleteLine(stageId, lineId)}
                   onAddLine={(stageId) => {
-                    j.addLine(stageId, true);
-                    if (t.id !== UNTAGGED) {
-                      // The new line is the last in stage; tag it with this row's tag.
-                      const after = j.doc.lines[stageId] ?? [];
-                      const last = after[after.length - 1];
-                      if (last) j.updateLine(stageId, last.id, { tagIds: [t.id] });
-                    }
+                    j.addLineInCell(stageId, t.id === UNTAGGED ? null : t.id);
                   }}
                   onManageTags={onManageTags}
                 />
