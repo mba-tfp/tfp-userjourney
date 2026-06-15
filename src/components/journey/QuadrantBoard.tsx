@@ -19,29 +19,36 @@ const HEX: Record<TagColor, string> = {
 
 type Pt = { x: number; y: number };
 
-// Isometric projection. Inputs are 1..5 along each axis; we map to 0..4.
-const TILE_X = 70;
-const TILE_Y = 36;
-const DEPTH = 56;
-const ORIGIN: Pt = { x: 470, y: 470 };
+// 2D scatter board. X = Urgency (1..5), Y = Impact (1..5, top is high).
+// Effort is encoded as bubble radius (smaller effort = smaller bubble).
+const VIEW_W = 940;
+const VIEW_H = 640;
+const PAD_L = 70;
+const PAD_R = 30;
+const PAD_T = 40;
+const PAD_B = 60;
+const PLOT_W = VIEW_W - PAD_L - PAD_R;
+const PLOT_H = VIEW_H - PAD_T - PAD_B;
 
-function project(impact: number, urgency: number, effort: number): Pt {
-  const i = impact - 1;
-  const u = urgency - 1;
-  const e = effort - 1;
+function project(impact: number, urgency: number): Pt {
+  const u = Math.max(1, Math.min(5, urgency));
+  const i = Math.max(1, Math.min(5, impact));
   return {
-    x: ORIGIN.x + (i - u) * TILE_X,
-    y: ORIGIN.y + (i + u) * TILE_Y - e * DEPTH,
+    x: PAD_L + ((u - 1) / 4) * PLOT_W,
+    y: PAD_T + ((5 - i) / 4) * PLOT_H,
   };
 }
 
-// Inverse for the planar (impact, urgency) drag. We hold effort fixed.
-function unproject(p: Pt, effort: number): { impact: number; urgency: number } {
-  const dx = p.x - ORIGIN.x;
-  const dy = p.y - ORIGIN.y + (effort - 1) * DEPTH;
-  const i = dy / (2 * TILE_Y) + dx / (2 * TILE_X);
-  const u = dy / (2 * TILE_Y) - dx / (2 * TILE_X);
-  return { impact: i + 1, urgency: u + 1 };
+function unproject(p: Pt): { impact: number; urgency: number } {
+  const urgency = 1 + ((p.x - PAD_L) / PLOT_W) * 4;
+  const impact = 5 - ((p.y - PAD_T) / PLOT_H) * 4;
+  return { impact, urgency };
+}
+
+function effortRadius(effort: number) {
+  const e = Math.max(1, Math.min(5, effort));
+  // 8..22 px
+  return 8 + ((e - 1) / 4) * 14;
 }
 
 function hash(s: string) {
@@ -93,16 +100,15 @@ export function QuadrantBoard() {
         if (l.exists) continue;
         const imp = l.impact ?? 3;
         const urg = l.urgency ?? 3;
-        const eff = l.effort ?? 3;
-        let pt = project(imp, urg, eff);
+        let pt = project(imp, urg);
         // Deterministic jitter to avoid full overlap.
         const h = hash(l.id);
-        pt = { x: pt.x + ((h % 9) - 4), y: pt.y + (((h >> 4) % 9) - 4) };
+        pt = { x: pt.x + ((h % 13) - 6), y: pt.y + (((h >> 4) % 13) - 6) };
         out.push({ line: l, stage: s, pt, color });
       }
     }
-    // Painter's algorithm: back-to-front (lower y first).
-    out.sort((a, b) => a.pt.y - b.pt.y);
+    // Bigger bubbles first so smaller ones stay clickable on top.
+    out.sort((a, b) => (b.line.effort ?? 3) - (a.line.effort ?? 3));
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.stages, doc.lines, doc.valueTags, stageFilter, valueFilter]);
@@ -112,10 +118,6 @@ export function QuadrantBoard() {
   const [drag, setDrag] = useState<{
     stageId: string;
     lineId: string;
-    effort: number;
-    shift: boolean;
-    startY: number;
-    startEffort: number;
   } | null>(null);
 
   const toSvgPt = (evt: { clientX: number; clientY: number }): Pt | null => {
@@ -135,18 +137,8 @@ export function QuadrantBoard() {
     const onMove = (e: PointerEvent) => {
       const p = toSvgPt(e);
       if (!p) return;
-      if (drag.shift || e.shiftKey) {
-        // Vertical drag → effort
-        const dy = drag.startY - e.clientY;
-        const nextEffort = drag.startEffort + dy / 50;
-        j.setLineScores(drag.stageId, drag.lineId, { effort: nextEffort });
-      } else {
-        const { impact, urgency } = unproject(p, drag.effort);
-        j.setLineScores(drag.stageId, drag.lineId, {
-          impact,
-          urgency,
-        });
-      }
+      const { impact, urgency } = unproject(p);
+      j.setLineScores(drag.stageId, drag.lineId, { impact, urgency });
     };
     const onUp = () => setDrag(null);
     window.addEventListener("pointermove", onMove);
@@ -170,7 +162,7 @@ export function QuadrantBoard() {
             return {
               line: l,
               stage: s,
-              pt: project(l.impact ?? 3, l.urgency ?? 3, l.effort ?? 3),
+              pt: project(l.impact ?? 3, l.urgency ?? 3),
               color: (valueTag?.color as TagColor) ?? "slate",
             };
           }
@@ -226,63 +218,25 @@ export function QuadrantBoard() {
         <div className="relative rounded-xl border border-border bg-gradient-to-b from-secondary/30 to-background overflow-hidden">
           <svg
             ref={svgRef}
-            viewBox="0 0 940 720"
+            viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
             className="w-full h-auto block select-none touch-none"
           >
             <defs>
-              <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="hsl(var(--secondary))" stopOpacity="0.4" />
-                <stop offset="1" stopColor="hsl(var(--secondary))" stopOpacity="0.1" />
-              </linearGradient>
               <filter id="dotShadow" x="-50%" y="-50%" width="200%" height="200%">
                 <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.25" />
               </filter>
             </defs>
 
-            <IsoFloor />
+            <Grid />
+            <QuadrantLabels />
             <AxisLabels />
-
-            {/* Effort pillars */}
-            {dots.map((d) => {
-              const base = project(d.line.impact ?? 3, d.line.urgency ?? 3, 1);
-              return (
-                <line
-                  key={`pillar-${d.line.id}`}
-                  x1={d.pt.x}
-                  y1={d.pt.y}
-                  x2={base.x}
-                  y2={base.y}
-                  stroke={HEX[d.color]}
-                  strokeOpacity="0.25"
-                  strokeWidth="1"
-                  strokeDasharray="2 3"
-                />
-              );
-            })}
-
-            {/* Floor markers under each dot */}
-            {dots.map((d) => {
-              const base = project(d.line.impact ?? 3, d.line.urgency ?? 3, 1);
-              return (
-                <ellipse
-                  key={`shadow-${d.line.id}`}
-                  cx={base.x}
-                  cy={base.y}
-                  rx={6}
-                  ry={3}
-                  fill="#000"
-                  opacity="0.12"
-                />
-              );
-            })}
 
             {/* Dots */}
             {dots.map((d) => {
               const isOnFire = !!d.stage.onFire;
               const isSel = selectedId === d.line.id;
               const isHov = hoverId === d.line.id;
-              const r =
-                6 + ((d.line.impact ?? 3) + (d.line.urgency ?? 3) - 2) * 0.9;
+              const r = effortRadius(d.line.effort ?? 3);
               return (
                 <g
                   key={d.line.id}
@@ -295,19 +249,15 @@ export function QuadrantBoard() {
                     setDrag({
                       stageId: d.stage.id,
                       lineId: d.line.id,
-                      effort: d.line.effort ?? 3,
-                      shift: e.shiftKey,
-                      startY: e.clientY,
-                      startEffort: d.line.effort ?? 3,
                     });
                   }}
                   onPointerEnter={() => setHoverId(d.line.id)}
                   onPointerLeave={() => setHoverId((h) => (h === d.line.id ? null : h))}
                 >
                   <circle
-                    r={r + 4}
+                    r={r + 5}
                     fill={HEX[d.color]}
-                    opacity={isSel || isHov ? 0.25 : 0}
+                    opacity={isSel ? 0.3 : isHov ? 0.18 : 0}
                   />
                   {isOnFire && (
                     <circle
@@ -320,6 +270,7 @@ export function QuadrantBoard() {
                   <circle
                     r={r}
                     fill={HEX[d.color]}
+                    fillOpacity="0.85"
                     stroke="#fff"
                     strokeWidth="1.5"
                     filter="url(#dotShadow)"
@@ -327,7 +278,7 @@ export function QuadrantBoard() {
                   {(isSel || isHov) && (
                     <text
                       x={r + 6}
-                      y={-r - 4}
+                      y={4}
                       className="fill-foreground"
                       fontSize="11"
                       fontWeight="600"
@@ -342,8 +293,8 @@ export function QuadrantBoard() {
 
             {dots.length === 0 && (
               <text
-                x="470"
-                y="380"
+                x={VIEW_W / 2}
+                y={VIEW_H / 2}
                 textAnchor="middle"
                 className="fill-muted-foreground"
                 fontSize="14"
@@ -354,10 +305,10 @@ export function QuadrantBoard() {
           </svg>
 
           <div className="absolute top-3 left-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Priority Quadrant · Impact × Urgency × Effort
+            Priority Quadrant · Impact × Urgency · bubble = Effort
           </div>
           <div className="absolute bottom-3 right-3 text-[10px] text-muted-foreground">
-            Drag dots to reposition · Hold <kbd className="px-1 rounded border border-border bg-secondary">Shift</kbd> to adjust Effort
+            Drag dots to reposition · Adjust Effort in the side panel
           </div>
         </div>
       </div>
