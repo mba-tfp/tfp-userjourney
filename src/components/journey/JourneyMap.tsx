@@ -7,6 +7,8 @@ import {
   Tag as TagIcon,
   Flame,
   ListChecks,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,6 +106,27 @@ export function JourneyMap() {
     </Tooltip>
   );
 
+  const toolDisabled = (
+    icon: React.ReactNode,
+    label: string,
+    onClick: () => void,
+    disabled: boolean,
+  ) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={onClick}
+          disabled={disabled}
+          className="h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+          aria-label={label}
+        >
+          {icon}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="min-h-dvh bg-background text-foreground">
@@ -121,6 +144,9 @@ export function JourneyMap() {
               />
             </div>
             <div className="flex items-center gap-1 pt-2">
+              {toolDisabled(<Undo2 className="h-4 w-4" />, "Undo (⌘Z)", j.undo, !j.canUndo)}
+              {toolDisabled(<Redo2 className="h-4 w-4" />, "Redo (⇧⌘Z)", j.redo, !j.canRedo)}
+              <span className="mx-1 h-5 w-px bg-border" />
               {tool(<TagIcon className="h-4 w-4" />, "Manage tags", openTagManager)}
               {tool(
                 <ListChecks className="h-4 w-4" />,

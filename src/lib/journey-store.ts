@@ -60,12 +60,21 @@ export function useJourney() {
   const save = useServerFn(saveJourney);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Undo / redo history of doc snapshots.
+  const past = useRef<JourneyDoc[]>([]);
+  const future = useRef<JourneyDoc[]>([]);
+  const skipHistory = useRef(false);
+  const HISTORY_LIMIT = 100;
+  const [historyTick, setHistoryTick] = useState(0);
+  const bumpHistory = () => setHistoryTick((n) => n + 1);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const { doc: stored } = await load();
         if (cancelled) return;
+        skipHistory.current = true;
         if (stored) {
           setDoc(normalize(stored));
         } else {
@@ -75,7 +84,10 @@ export function useJourney() {
         }
       } catch (e) {
         console.error("Failed to load journey", e);
-        if (!cancelled) setDoc(seedDoc);
+        if (!cancelled) {
+          skipHistory.current = true;
+          setDoc(seedDoc);
+        }
       } finally {
         if (!cancelled) setHydrated(true);
       }
@@ -97,8 +109,69 @@ export function useJourney() {
   }, [doc, hydrated, save]);
 
   const update = useCallback((fn: (d: JourneyDoc) => JourneyDoc) => {
-    setDoc((d) => fn(structuredClone(d)));
+    setDoc((d) => {
+      if (!skipHistory.current) {
+        past.current.push(d);
+        if (past.current.length > HISTORY_LIMIT) past.current.shift();
+        if (future.current.length) future.current = [];
+        bumpHistory();
+      }
+      skipHistory.current = false;
+      return fn(structuredClone(d));
+    });
   }, []);
+
+  const undo = useCallback(() => {
+    setDoc((d) => {
+      const prev = past.current.pop();
+      if (!prev) return d;
+      future.current.push(d);
+      skipHistory.current = true;
+      bumpHistory();
+      return prev;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setDoc((d) => {
+      const next = future.current.pop();
+      if (!next) return d;
+      past.current.push(d);
+      skipHistory.current = true;
+      bumpHistory();
+      return next;
+    });
+  }, []);
+
+  // Global keyboard shortcuts: Cmd/Ctrl+Z = undo, Shift+Cmd/Ctrl+Z or Ctrl+Y = redo.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   return {
     doc,
@@ -369,7 +442,28 @@ export function useJourney() {
         return d;
       }),
 
-    reset: () => setDoc(seedDoc),
-    importDoc: (next: JourneyDoc) => setDoc(next),
+    reset: () =>
+      setDoc((d) => {
+        past.current.push(d);
+        if (past.current.length > HISTORY_LIMIT) past.current.shift();
+        future.current = [];
+        bumpHistory();
+        return seedDoc;
+      }),
+    importDoc: (next: JourneyDoc) =>
+      setDoc((d) => {
+        past.current.push(d);
+        if (past.current.length > HISTORY_LIMIT) past.current.shift();
+        future.current = [];
+        bumpHistory();
+        return next;
+      }),
+
+    undo,
+    redo,
+    canUndo: past.current.length > 0,
+    canRedo: future.current.length > 0,
+    // expose tick to satisfy lint usage and force consumers to re-render on history change
+    _historyTick: historyTick,
   };
 }
