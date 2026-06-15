@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Plus,
   Download,
@@ -13,7 +14,6 @@ import { useJourney } from "@/lib/journey-store";
 import { EditableText } from "./EditableText";
 import { LineListCard } from "./LineListCard";
 import { StageLifecycle } from "./StageLifecycle";
-import { TagManagerDialog } from "./TagManagerDialog";
 import { TagPicker } from "./TagPicker";
 import type { Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,8 @@ export function JourneyMap() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [showMoneyOnFire, setShowMoneyOnFire] = useState(false);
-  const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const navigate = useNavigate();
+  const openTagManager = () => navigate({ to: "/tags" });
 
   const selectedStage = j.doc.stages.find((s) => s.id === selectedStageId) ?? null;
   const selectedIndex = selectedStage ? j.doc.stages.indexOf(selectedStage) : -1;
@@ -140,7 +141,7 @@ export function JourneyMap() {
               />
             </div>
             <div className="flex items-center gap-1 pt-2">
-              {tool(<TagIcon className="h-4 w-4" />, "Manage tags", () => setTagManagerOpen(true))}
+              {tool(<TagIcon className="h-4 w-4" />, "Manage tags", openTagManager)}
               {tool(<Plus className="h-4 w-4" />, "Add stage", () => j.addStage())}
               <span className="mx-1 h-5 w-px bg-border" />
               {tool(<Download className="h-4 w-4" />, "Export JSON", exportJson)}
@@ -201,7 +202,7 @@ export function JourneyMap() {
               onRename={(id, patch) => j.setStage(id, patch)}
               onValueChange={(id, valueTagIds) => j.setStage(id, { valueTagIds })}
               onToggleOnFire={(id) => j.toggleStageOnFire(id)}
-              onManageValueTags={() => setTagManagerOpen(true)}
+              onManageValueTags={openTagManager}
               onMove={(id, dir) => j.moveStage(id, dir)}
               onInsertAfter={(i) => j.addStage(i)}
               onDelete={(s) => {
@@ -279,7 +280,7 @@ export function JourneyMap() {
                       valueTags={j.doc.valueTags}
                       onFire={showMoneyOnFire && !!selectedStage.onFire}
                       onChange={(valueTagIds) => j.setStage(selectedStage.id, { valueTagIds })}
-                      onManage={() => setTagManagerOpen(true)}
+                      onManage={openTagManager}
                     />
                     <button
                       onClick={() => j.toggleStageOnFire(selectedStage.id)}
@@ -321,7 +322,7 @@ export function JourneyMap() {
                     onUpdateLine={(id, patch) => j.updateLine(selectedStage.id, id, patch)}
                     onDeleteLine={(id) => j.deleteLine(selectedStage.id, id)}
                     onMoveLine={(id, dir) => j.moveLine(selectedStage.id, id, dir)}
-                    onManageTags={() => setTagManagerOpen(true)}
+                    onManageTags={openTagManager}
                   />
                   <LineListCard
                     title="What Doesn't Exist Today"
@@ -333,7 +334,7 @@ export function JourneyMap() {
                     onUpdateLine={(id, patch) => j.updateLine(selectedStage.id, id, patch)}
                     onDeleteLine={(id) => j.deleteLine(selectedStage.id, id)}
                     onMoveLine={(id, dir) => j.moveLine(selectedStage.id, id, dir)}
-                    onManageTags={() => setTagManagerOpen(true)}
+                    onManageTags={openTagManager}
                   />
                 </div>
               </div>
@@ -343,20 +344,6 @@ export function JourneyMap() {
 
         </main>
       </div>
-      <TagManagerDialog
-        open={tagManagerOpen}
-        onOpenChange={setTagManagerOpen}
-        tags={j.doc.tags}
-        onAdd={() => j.addTag()}
-        onRename={j.renameTag}
-        onSetColor={j.setTagColor}
-        onDelete={j.deleteTag}
-        valueTags={j.doc.valueTags}
-        onAddValueTag={() => j.addValueTag()}
-        onRenameValueTag={j.renameValueTag}
-        onSetValueTagColor={j.setValueTagColor}
-        onDeleteValueTag={j.deleteValueTag}
-      />
     </TooltipProvider>
   );
 }

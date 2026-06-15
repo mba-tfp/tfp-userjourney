@@ -103,7 +103,13 @@ export function useJourney() {
     setStage: (id: string, patch: Partial<Stage>) =>
       update((d) => {
         const i = d.stages.findIndex((s) => s.id === id);
-        if (i >= 0) d.stages[i] = { ...d.stages[i], ...patch };
+        if (i >= 0) {
+          const next = { ...d.stages[i], ...patch };
+          if (Array.isArray(next.valueTagIds)) {
+            next.valueTagIds = Array.from(new Set(next.valueTagIds));
+          }
+          d.stages[i] = next;
+        }
         return d;
       }),
     addStage: (afterIndex?: number) =>
@@ -153,7 +159,13 @@ export function useJourney() {
         const arr = d.lines[stageId];
         if (!arr) return d;
         const i = arr.findIndex((l) => l.id === lineId);
-        if (i >= 0) arr[i] = { ...arr[i], ...patch };
+        if (i >= 0) {
+          const next = { ...arr[i], ...patch };
+          if (Array.isArray(next.tagIds)) {
+            next.tagIds = Array.from(new Set(next.tagIds));
+          }
+          arr[i] = next;
+        }
         return d;
       }),
     deleteLine: (stageId: string, lineId: string) =>
@@ -202,6 +214,37 @@ export function useJourney() {
         }
         return d;
       }),
+    reorderTags: (nextOrder: string[]) =>
+      update((d) => {
+        const byId = new Map(d.tags.map((t) => [t.id, t]));
+        const seen = new Set<string>();
+        const ordered: Tag[] = [];
+        for (const id of nextOrder) {
+          const t = byId.get(id);
+          if (t && !seen.has(id)) {
+            ordered.push(t);
+            seen.add(id);
+          }
+        }
+        // Append any tags missing from nextOrder, preserving prior order.
+        for (const t of d.tags) if (!seen.has(t.id)) ordered.push(t);
+        d.tags = ordered;
+        return d;
+      }),
+    mergeTag: (sourceId: string, targetId: string) =>
+      update((d) => {
+        if (sourceId === targetId) return d;
+        if (!d.tags.find((t) => t.id === targetId)) return d;
+        for (const sid of Object.keys(d.lines)) {
+          d.lines[sid] = d.lines[sid].map((l) => {
+            if (!l.tagIds.includes(sourceId)) return l;
+            const rewritten = l.tagIds.map((id) => (id === sourceId ? targetId : id));
+            return { ...l, tagIds: Array.from(new Set(rewritten)) };
+          });
+        }
+        d.tags = d.tags.filter((t) => t.id !== sourceId);
+        return d;
+      }),
 
     // Value tag CRUD (editable Capacity / Revenue / Cost registry)
     addValueTag: (name = "New value", color: Tag["color"] = "slate") =>
@@ -227,6 +270,34 @@ export function useJourney() {
         for (const s of d.stages) {
           s.valueTagIds = s.valueTagIds.filter((t) => t !== id);
         }
+        return d;
+      }),
+    reorderValueTags: (nextOrder: string[]) =>
+      update((d) => {
+        const byId = new Map(d.valueTags.map((t) => [t.id, t]));
+        const seen = new Set<string>();
+        const ordered: Tag[] = [];
+        for (const id of nextOrder) {
+          const t = byId.get(id);
+          if (t && !seen.has(id)) {
+            ordered.push(t);
+            seen.add(id);
+          }
+        }
+        for (const t of d.valueTags) if (!seen.has(t.id)) ordered.push(t);
+        d.valueTags = ordered;
+        return d;
+      }),
+    mergeValueTag: (sourceId: string, targetId: string) =>
+      update((d) => {
+        if (sourceId === targetId) return d;
+        if (!d.valueTags.find((t) => t.id === targetId)) return d;
+        for (const s of d.stages) {
+          if (!s.valueTagIds.includes(sourceId)) continue;
+          const rewritten = s.valueTagIds.map((id) => (id === sourceId ? targetId : id));
+          s.valueTagIds = Array.from(new Set(rewritten));
+        }
+        d.valueTags = d.valueTags.filter((t) => t.id !== sourceId);
         return d;
       }),
 
