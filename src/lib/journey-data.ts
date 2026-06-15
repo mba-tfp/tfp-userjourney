@@ -3,7 +3,7 @@ export type Tag = { id: string; name: string; color: string };
 export type Line = {
   id: string;
   text: string;
-  tagId?: string;
+  tagIds: string[];
   exists: boolean;
 };
 
@@ -12,7 +12,7 @@ export type Stage = {
   emoji: string;
   title: string;
   subtitle: string;
-  valueTagId?: string;
+  valueTagIds: string[];
   onFire?: boolean;
 };
 
@@ -65,7 +65,7 @@ const stageDefs: StageSeed[] = [
 const stages: Stage[] = stageDefs.map(({ value, ...rest }, i) => ({
   ...rest,
   id: uid("s", i + 1),
-  valueTagId: VALUE_TAG_IDS[value],
+  valueTagIds: [VALUE_TAG_IDS[value]],
   onFire: ON_FIRE_INDEXES.has(i),
 }));
 
@@ -218,7 +218,7 @@ stages.forEach((stage, si) => {
       stageLines.push({
         id: uid(`${stage.id}-ln`, counter++),
         text: sl.text,
-        tagId,
+        tagIds: tagId ? [tagId] : [],
         exists: !sl.gap,
       });
     });

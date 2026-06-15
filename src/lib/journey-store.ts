@@ -9,29 +9,50 @@ import {
   type Tag,
 } from "./journey-data";
 
-const KEY = "otto-journey-doc-v3";
+const KEY = "otto-journey-doc-v4";
+const KEY_V3 = "otto-journey-doc-v3";
 const KEY_V2 = "otto-journey-doc-v2";
 const LEGACY_KEY = "otto-journey-doc-v1";
 
 // v2 docs stored stage.value as "capacity" | "revenue" | "cost" and had no valueTags/onFire
-function migrateV2(v2: any): JourneyDoc {
-  const stages: Stage[] = (v2?.stages ?? []).map((s: any, i: number) => {
-    const v = s?.value as keyof typeof VALUE_TAG_IDS | undefined;
+// Normalize any prior shape (v2 single value string, v3 single tagId/valueTagId)
+// into the current multi-tag shape.
+function normalize(raw: any): JourneyDoc {
+  const stages: Stage[] = (raw?.stages ?? []).map((s: any, i: number) => {
+    let valueTagIds: string[] = [];
+    if (Array.isArray(s?.valueTagIds)) valueTagIds = s.valueTagIds.filter(Boolean);
+    else if (typeof s?.valueTagId === "string") valueTagIds = [s.valueTagId];
+    else if (typeof s?.value === "string" && (VALUE_TAG_IDS as any)[s.value]) {
+      valueTagIds = [(VALUE_TAG_IDS as any)[s.value]];
+    }
     return {
       id: s.id,
       emoji: s.emoji,
       title: s.title,
       subtitle: s.subtitle,
-      valueTagId: v && VALUE_TAG_IDS[v] ? VALUE_TAG_IDS[v] : seedDoc.stages[i]?.valueTagId,
+      valueTagIds,
       onFire: typeof s.onFire === "boolean" ? s.onFire : seedDoc.stages[i]?.onFire ?? false,
     };
   });
+  const lines: Record<string, Line[]> = {};
+  for (const [sid, arr] of Object.entries((raw?.lines ?? {}) as Record<string, any[]>)) {
+    lines[sid] = (arr ?? []).map((l: any) => ({
+      id: l.id,
+      text: l.text ?? "",
+      exists: !!l.exists,
+      tagIds: Array.isArray(l.tagIds)
+        ? l.tagIds.filter(Boolean)
+        : typeof l.tagId === "string"
+          ? [l.tagId]
+          : [],
+    }));
+  }
   return {
-    title: v2?.title ?? seedDoc.title,
+    title: raw?.title ?? seedDoc.title,
     stages,
-    tags: v2?.tags ?? seedDoc.tags,
-    valueTags: seedDoc.valueTags,
-    lines: v2?.lines ?? {},
+    tags: raw?.tags ?? seedDoc.tags,
+    valueTags: raw?.valueTags ?? seedDoc.valueTags,
+    lines,
   };
 }
 
@@ -39,20 +60,14 @@ function load(): JourneyDoc {
   if (typeof window === "undefined") return seedDoc;
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as JourneyDoc;
-      // Defensive: ensure valueTags exist on older v3 saves
-      if (!parsed.valueTags) parsed.valueTags = seedDoc.valueTags;
-      return parsed;
-    }
-    // One-shot migrate from v2
-    const v2Raw = localStorage.getItem(KEY_V2);
-    if (v2Raw) {
-      const migrated = migrateV2(JSON.parse(v2Raw));
+    if (raw) return normalize(JSON.parse(raw));
+    // One-shot migrate from any previous version
+    const prior = localStorage.getItem(KEY_V3) ?? localStorage.getItem(KEY_V2);
+    if (prior) {
+      const migrated = normalize(JSON.parse(prior));
       localStorage.setItem(KEY, JSON.stringify(migrated));
       return migrated;
     }
-    // v1 legacy storage no longer migrated; clean up if present
     if (localStorage.getItem(LEGACY_KEY)) localStorage.removeItem(LEGACY_KEY);
     return seedDoc;
   } catch {
@@ -98,6 +113,7 @@ export function useJourney() {
           emoji: "✨",
           title: "New Stage",
           subtitle: "Describe this stage",
+          valueTagIds: [],
         };
         const idx = afterIndex === undefined ? d.stages.length : afterIndex + 1;
         d.stages.splice(idx, 0, stage);
@@ -129,7 +145,7 @@ export function useJourney() {
     addLine: (stageId: string, exists: boolean) =>
       update((d) => {
         d.lines[stageId] = d.lines[stageId] ?? [];
-        d.lines[stageId].push({ id: newId("ln"), text: "", exists });
+        d.lines[stageId].push({ id: newId("ln"), text: "", exists, tagIds: [] });
         return d;
       }),
     updateLine: (stageId: string, lineId: string, patch: Partial<Line>) =>
@@ -179,9 +195,10 @@ export function useJourney() {
       update((d) => {
         d.tags = d.tags.filter((t) => t.id !== id);
         for (const sid of Object.keys(d.lines)) {
-          d.lines[sid] = d.lines[sid].map((l) =>
-            l.tagId === id ? { ...l, tagId: undefined } : l,
-          );
+          d.lines[sid] = d.lines[sid].map((l) => ({
+            ...l,
+            tagIds: l.tagIds.filter((t) => t !== id),
+          }));
         }
         return d;
       }),
@@ -208,7 +225,7 @@ export function useJourney() {
       update((d) => {
         d.valueTags = d.valueTags.filter((t) => t.id !== id);
         for (const s of d.stages) {
-          if (s.valueTagId === id) s.valueTagId = undefined;
+          s.valueTagIds = s.valueTagIds.filter((t) => t !== id);
         }
         return d;
       }),
