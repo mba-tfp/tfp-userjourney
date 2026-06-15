@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Flame, Tag as TagIcon, LogOut } from "lucide-react";
+import { ArrowLeft, Flame, Tag as TagIcon, LogOut, Undo2, Redo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useJourney } from "@/lib/journey-store";
 import { supabase } from "@/integrations/supabase/client";
@@ -84,6 +84,23 @@ function ConclusionPage() {
                 dotColor={v.color as TagColor}
               />
             ))}
+            <span className="mx-1 h-5 w-px bg-border" />
+            <button
+              onClick={j.undo}
+              disabled={!j.canUndo}
+              title="Undo (⌘Z)"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={j.redo}
+              disabled={!j.canRedo}
+              title="Redo (⇧⌘Z)"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
             <span className="mx-1 h-5 w-px bg-border" />
             <button
               onClick={openTagManager}
