@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, type ReactElement } from "react";
 import { useJourney } from "@/lib/journey-store";
 import type { Line, Stage, Tag, TagColor } from "@/lib/journey-data";
 import { TAG_PILL } from "./tag-colors";
@@ -397,7 +397,7 @@ function truncate(s: string, n: number) {
 
 function IsoFloor() {
   // 5×5 grid of tiles; draw lines at impact = 1..5 and urgency = 1..5.
-  const lines: JSX.Element[] = [];
+  const lines: ReactElement[] = [];
   for (let i = 1; i <= 5; i++) {
     const a = project(i, 1, 1);
     const b = project(i, 5, 1);
