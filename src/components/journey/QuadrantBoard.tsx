@@ -19,36 +19,33 @@ const HEX: Record<TagColor, string> = {
 
 type Pt = { x: number; y: number };
 
-// 2D scatter board. X = Urgency (1..5), Y = Impact (1..5, top is high).
-// Effort is encoded as bubble radius (smaller effort = smaller bubble).
+// 2D board. X = Effort (1..5). Dual Y axes on the same 0–100 scale:
+// left axis = Urgency, right axis = Impact. Each item is rendered as
+// a vertical segment from its urgency point (left-side marker) to its
+// impact point (right-side marker) at x = effort.
 const VIEW_W = 940;
 const VIEW_H = 640;
 const PAD_L = 70;
-const PAD_R = 30;
+const PAD_R = 70;
 const PAD_T = 40;
 const PAD_B = 60;
 const PLOT_W = VIEW_W - PAD_L - PAD_R;
 const PLOT_H = VIEW_H - PAD_T - PAD_B;
 
-function project(impact: number, urgency: number): Pt {
-  const u = Math.max(1, Math.min(5, urgency));
-  const i = Math.max(1, Math.min(5, impact));
-  return {
-    x: PAD_L + ((u - 1) / 4) * PLOT_W,
-    y: PAD_T + ((5 - i) / 4) * PLOT_H,
-  };
-}
-
-function unproject(p: Pt): { impact: number; urgency: number } {
-  const urgency = 1 + ((p.x - PAD_L) / PLOT_W) * 4;
-  const impact = 5 - ((p.y - PAD_T) / PLOT_H) * 4;
-  return { impact, urgency };
-}
-
-function effortRadius(effort: number) {
+// Map a 1..5 score to a pixel coordinate along an axis.
+function xForEffort(effort: number) {
   const e = Math.max(1, Math.min(5, effort));
-  // 8..22 px
-  return 8 + ((e - 1) / 4) * 14;
+  return PAD_L + ((e - 1) / 4) * PLOT_W;
+}
+function yForScore(score: number) {
+  const s = Math.max(1, Math.min(5, score));
+  return PAD_T + ((5 - s) / 4) * PLOT_H;
+}
+function effortFromX(x: number) {
+  return 1 + ((x - PAD_L) / PLOT_W) * 4;
+}
+function scoreFromY(y: number) {
+  return 5 - ((y - PAD_T) / PLOT_H) * 4;
 }
 
 function hash(s: string) {
@@ -60,7 +57,10 @@ function hash(s: string) {
 type Plotted = {
   line: Line;
   stage: Stage;
-  pt: Pt;
+  x: number;
+  yImpact: number;
+  yUrgency: number;
+  jitter: number;
   color: TagColor;
 };
 
