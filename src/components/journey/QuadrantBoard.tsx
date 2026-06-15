@@ -703,9 +703,8 @@ function EmptyPanel({ total }: { total: number }) {
       <div className="text-sm font-semibold text-foreground mb-1">
         {total} gap{total === 1 ? "" : "s"} plotted
       </div>
-      Click a dot to inspect it, or drag dots around the cube to re-prioritize.
-      Hold <kbd className="px-1 rounded border border-border bg-background">Shift</kbd> while
-      dragging vertically to change Effort.
+      Click a bubble to inspect it, or drag bubbles around the grid to
+      re-prioritize. Effort lives in the side panel.
     </div>
   );
 }
