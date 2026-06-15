@@ -255,57 +255,89 @@ export function QuadrantBoard() {
             </defs>
 
             <Grid />
-            <QuadrantLabels />
             <AxisLabels />
 
-            {/* Dots */}
+            {/* Segments: urgency (left marker) ↔ impact (right marker) at x = effort */}
             {dots.map((d) => {
               const isOnFire = !!d.stage.onFire;
               const isSel = selectedId === d.line.id;
               const isHov = hoverId === d.line.id;
-              const r = effortRadius(d.line.effort ?? 3);
+              const r = 7;
+              const color = HEX[d.color];
+              const labelY = Math.min(d.yImpact, d.yUrgency) - 10;
               return (
                 <g
                   key={d.line.id}
-                  transform={`translate(${d.pt.x} ${d.pt.y})`}
-                  className="cursor-grab active:cursor-grabbing"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    (e.target as Element).setPointerCapture?.(e.pointerId);
-                    setSelectedId(d.line.id);
-                    setDrag({
-                      stageId: d.stage.id,
-                      lineId: d.line.id,
-                    });
-                  }}
                   onPointerEnter={() => setHoverId(d.line.id)}
                   onPointerLeave={() => setHoverId((h) => (h === d.line.id ? null : h))}
                 >
+                  {/* Connecting segment — drag to change Effort only */}
+                  <line
+                    x1={d.x}
+                    y1={d.yUrgency}
+                    x2={d.x}
+                    y2={d.yImpact}
+                    stroke={color}
+                    strokeOpacity={isSel || isHov ? 0.9 : 0.45}
+                    strokeWidth={isSel ? 3 : 2}
+                    strokeLinecap="round"
+                    className="cursor-ew-resize"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setSelectedId(d.line.id);
+                      setDrag({ stageId: d.stage.id, lineId: d.line.id, mode: "effort" });
+                    }}
+                  />
+                  {/* Urgency marker (left-axis side) — hollow */}
                   <circle
-                    r={r + 5}
-                    fill={HEX[d.color]}
-                    opacity={isSel ? 0.3 : isHov ? 0.18 : 0}
+                    cx={d.x}
+                    cy={d.yUrgency}
+                    r={r}
+                    fill="hsl(var(--background))"
+                    stroke={color}
+                    strokeWidth="2"
+                    className="cursor-grab active:cursor-grabbing"
+                    filter="url(#dotShadow)"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setSelectedId(d.line.id);
+                      setDrag({ stageId: d.stage.id, lineId: d.line.id, mode: "urgency" });
+                    }}
+                  />
+                  {/* Impact marker (right-axis side) — filled */}
+                  <circle
+                    cx={d.x}
+                    cy={d.yImpact}
+                    r={r}
+                    fill={color}
+                    fillOpacity="0.9"
+                    stroke="#fff"
+                    strokeWidth="1.5"
+                    className="cursor-grab active:cursor-grabbing"
+                    filter="url(#dotShadow)"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setSelectedId(d.line.id);
+                      setDrag({ stageId: d.stage.id, lineId: d.line.id, mode: "impact" });
+                    }}
                   />
                   {isOnFire && (
                     <circle
-                      r={r + 2}
+                      cx={d.x}
+                      cy={d.yImpact}
+                      r={r + 3}
                       fill="none"
                       stroke="hsl(var(--destructive))"
                       strokeWidth="1.5"
                     />
                   )}
-                  <circle
-                    r={r}
-                    fill={HEX[d.color]}
-                    fillOpacity="0.85"
-                    stroke="#fff"
-                    strokeWidth="1.5"
-                    filter="url(#dotShadow)"
-                  />
                   {(isSel || isHov) && (
                     <text
-                      x={r + 6}
-                      y={4}
+                      x={d.x + r + 6}
+                      y={labelY + 4}
                       className="fill-foreground"
                       fontSize="11"
                       fontWeight="600"
@@ -332,10 +364,10 @@ export function QuadrantBoard() {
           </svg>
 
           <div className="absolute top-3 left-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Priority Quadrant · Impact × Urgency · bubble = Effort
+            Priority Plot · Urgency (○) ↔ Impact (●) · X = Effort
           </div>
           <div className="absolute bottom-3 right-3 text-[10px] text-muted-foreground">
-            Drag dots to reposition · Adjust Effort in the side panel
+            Drag markers to set scores · Drag segment to shift Effort
           </div>
         </div>
       </div>
