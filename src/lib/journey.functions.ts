@@ -26,7 +26,7 @@ export const saveJourney = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { error } = await supabase
       .from("journeys")
-      .upsert({ user_id: userId, doc: data.doc as object }, { onConflict: "user_id" });
+      .upsert({ user_id: userId, doc: data.doc as any }, { onConflict: "user_id" });
     if (error) throw error;
     return { ok: true };
   });
