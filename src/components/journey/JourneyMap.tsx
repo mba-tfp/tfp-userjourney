@@ -19,16 +19,16 @@ import type { Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
 
 function ValueTag({
-  valueTagId,
+  valueTagIds,
   valueTags,
   onFire,
   onChange,
   onManage,
 }: {
-  valueTagId?: string;
+  valueTagIds: string[];
   valueTags: Tag[];
   onFire?: boolean;
-  onChange: (next: string | undefined) => void;
+  onChange: (next: string[]) => void;
   onManage: () => void;
 }) {
   return (
@@ -40,7 +40,7 @@ function ValueTag({
     >
       <TagPicker
         tags={valueTags}
-        value={valueTagId}
+        values={valueTagIds}
         onChange={onChange}
         onManage={onManage}
         placeholder="Set value"
@@ -199,7 +199,7 @@ export function JourneyMap() {
               }
               onDeselect={() => setSelectedStageId(null)}
               onRename={(id, patch) => j.setStage(id, patch)}
-              onValueChange={(id, valueTagId) => j.setStage(id, { valueTagId })}
+              onValueChange={(id, valueTagIds) => j.setStage(id, { valueTagIds })}
               onToggleOnFire={(id) => j.toggleStageOnFire(id)}
               onManageValueTags={() => setTagManagerOpen(true)}
               onMove={(id, dir) => j.moveStage(id, dir)}
@@ -275,10 +275,10 @@ export function JourneyMap() {
                       {selectedStage.emoji}
                     </div>
                     <ValueTag
-                      valueTagId={selectedStage.valueTagId}
+                      valueTagIds={selectedStage.valueTagIds}
                       valueTags={j.doc.valueTags}
                       onFire={showMoneyOnFire && !!selectedStage.onFire}
-                      onChange={(valueTagId) => j.setStage(selectedStage.id, { valueTagId })}
+                      onChange={(valueTagIds) => j.setStage(selectedStage.id, { valueTagIds })}
                       onManage={() => setTagManagerOpen(true)}
                     />
                     <button

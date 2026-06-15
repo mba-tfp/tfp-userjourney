@@ -37,8 +37,8 @@ export function LineRow({
       <div className="pt-0.5">
         <TagPicker
           tags={tags}
-          value={line.tagId}
-          onChange={(tagId) => onChange({ tagId })}
+          values={line.tagIds}
+          onChange={(tagIds) => onChange({ tagIds })}
           onManage={onManageTags}
         />
       </div>

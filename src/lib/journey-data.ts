@@ -3,7 +3,7 @@ export type Tag = { id: string; name: string; color: string };
 export type Line = {
   id: string;
   text: string;
-  tagId?: string;
+  tagIds: string[];
   exists: boolean;
 };
 
@@ -12,7 +12,7 @@ export type Stage = {
   emoji: string;
   title: string;
   subtitle: string;
-  valueTagId?: string;
+  valueTagIds: string[];
   onFire?: boolean;
 };
 
@@ -45,7 +45,7 @@ const valueTagSeed: Tag[] = [
 // Original indexes (0-based) that were flagged "money on fire"
 const ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
 
-type StageSeed = Omit<Stage, "id" | "valueTagId" | "onFire"> & {
+type StageSeed = Omit<Stage, "id" | "valueTagIds" | "onFire"> & {
   value: keyof typeof VALUE_TAG_IDS;
 };
 const stageDefs: StageSeed[] = [
@@ -65,7 +65,7 @@ const stageDefs: StageSeed[] = [
 const stages: Stage[] = stageDefs.map(({ value, ...rest }, i) => ({
   ...rest,
   id: uid("s", i + 1),
-  valueTagId: VALUE_TAG_IDS[value],
+  valueTagIds: [VALUE_TAG_IDS[value]],
   onFire: ON_FIRE_INDEXES.has(i),
 }));
 
@@ -218,7 +218,7 @@ stages.forEach((stage, si) => {
       stageLines.push({
         id: uid(`${stage.id}-ln`, counter++),
         text: sl.text,
-        tagId,
+        tagIds: tagId ? [tagId] : [],
         exists: !sl.gap,
       });
     });
