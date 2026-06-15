@@ -9,68 +9,68 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TagsRouteImport } from './routes/tags'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedTagsRouteImport } from './routes/_authenticated/tags'
 
-const TagsRoute = TagsRouteImport.update({
-  id: '/tags',
-  path: '/tags',
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/_authenticated/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthenticatedTagsRoute = AuthenticatedTagsRouteImport.update({
+  id: '/_authenticated/tags',
+  path: '/tags',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/tags': typeof TagsRoute
+  '/tags': typeof AuthenticatedTagsRoute
+  '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/tags': typeof TagsRoute
+  '/tags': typeof AuthenticatedTagsRoute
+  '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/tags': typeof TagsRoute
+  '/_authenticated/tags': typeof AuthenticatedTagsRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/tags'
+  fullPaths: '/tags' | '/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/tags'
-  id: '__root__' | '/' | '/tags'
+  to: '/tags' | '/'
+  id: '__root__' | '/_authenticated/tags' | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  TagsRoute: typeof TagsRoute
+  AuthenticatedTagsRoute: typeof AuthenticatedTagsRoute
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/tags': {
-      id: '/tags'
-      path: '/tags'
-      fullPath: '/tags'
-      preLoaderRoute: typeof TagsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
+    '/_authenticated/': {
+      id: '/_authenticated/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/tags': {
+      id: '/_authenticated/tags'
+      path: '/tags'
+      fullPath: '/tags'
+      preLoaderRoute: typeof AuthenticatedTagsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  TagsRoute: TagsRoute,
+  AuthenticatedTagsRoute: AuthenticatedTagsRoute,
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

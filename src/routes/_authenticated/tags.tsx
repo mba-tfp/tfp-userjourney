@@ -31,7 +31,7 @@ import { TAG_COLORS, type Tag, type TagColor } from "@/lib/journey-data";
 import { TAG_DOT } from "@/components/journey/tag-colors";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/tags")({
+export const Route = createFileRoute("/_authenticated/tags")({
   head: () => ({
     meta: [
       { title: "Manage Tags — Journey Map" },
