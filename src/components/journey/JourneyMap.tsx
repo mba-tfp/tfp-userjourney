@@ -74,6 +74,17 @@ export function JourneyMap() {
     [j.doc.stages],
   );
 
+  if (!j.hydrated) {
+    return (
+      <div className="min-h-dvh bg-background text-foreground">
+        <div className="mx-auto max-w-[1400px] px-8 pt-7 pb-6">
+          <div className="h-3 w-48 rounded bg-secondary animate-pulse" />
+          <div className="mt-3 h-9 w-96 max-w-full rounded bg-secondary animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(j.doc, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
