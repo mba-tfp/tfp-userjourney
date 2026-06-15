@@ -100,15 +100,26 @@ export function QuadrantBoard() {
         if (l.exists) continue;
         const imp = l.impact ?? 3;
         const urg = l.urgency ?? 3;
-        let pt = project(imp, urg);
-        // Deterministic jitter to avoid full overlap.
+        const eff = l.effort ?? 3;
+        // Deterministic horizontal jitter so items at the same effort don't fully overlap.
         const h = hash(l.id);
-        pt = { x: pt.x + ((h % 13) - 6), y: pt.y + (((h >> 4) % 13) - 6) };
-        out.push({ line: l, stage: s, pt, color });
+        const jitter = ((h % 21) - 10); // -10..+10 px
+        out.push({
+          line: l,
+          stage: s,
+          x: xForEffort(eff) + jitter,
+          yImpact: yForScore(imp),
+          yUrgency: yForScore(urg),
+          jitter,
+          color,
+        });
       }
     }
-    // Bigger bubbles first so smaller ones stay clickable on top.
-    out.sort((a, b) => (b.line.effort ?? 3) - (a.line.effort ?? 3));
+    // Longer segments (bigger gap between urgency & impact) painted first so short ones land on top.
+    out.sort(
+      (a, b) =>
+        Math.abs(b.yImpact - b.yUrgency) - Math.abs(a.yImpact - a.yUrgency),
+    );
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.stages, doc.lines, doc.valueTags, stageFilter, valueFilter]);
@@ -118,6 +129,7 @@ export function QuadrantBoard() {
   const [drag, setDrag] = useState<{
     stageId: string;
     lineId: string;
+    mode: "impact" | "urgency" | "effort";
   } | null>(null);
 
   const toSvgPt = (evt: { clientX: number; clientY: number }): Pt | null => {
@@ -137,8 +149,20 @@ export function QuadrantBoard() {
     const onMove = (e: PointerEvent) => {
       const p = toSvgPt(e);
       if (!p) return;
-      const { impact, urgency } = unproject(p);
-      j.setLineScores(drag.stageId, drag.lineId, { impact, urgency });
+      const effort = effortFromX(p.x);
+      if (drag.mode === "impact") {
+        j.setLineScores(drag.stageId, drag.lineId, {
+          effort,
+          impact: scoreFromY(p.y),
+        });
+      } else if (drag.mode === "urgency") {
+        j.setLineScores(drag.stageId, drag.lineId, {
+          effort,
+          urgency: scoreFromY(p.y),
+        });
+      } else {
+        j.setLineScores(drag.stageId, drag.lineId, { effort });
+      }
     };
     const onUp = () => setDrag(null);
     window.addEventListener("pointermove", onMove);
@@ -162,7 +186,10 @@ export function QuadrantBoard() {
             return {
               line: l,
               stage: s,
-              pt: project(l.impact ?? 3, l.urgency ?? 3),
+              x: xForEffort(l.effort ?? 3),
+              yImpact: yForScore(l.impact ?? 3),
+              yUrgency: yForScore(l.urgency ?? 3),
+              jitter: 0,
               color: (valueTag?.color as TagColor) ?? "slate",
             };
           }
