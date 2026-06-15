@@ -729,8 +729,9 @@ function EmptyPanel({ total }: { total: number }) {
       <div className="text-sm font-semibold text-foreground mb-1">
         {total} gap{total === 1 ? "" : "s"} plotted
       </div>
-      Click a bubble to inspect it, or drag bubbles around the grid to
-      re-prioritize. Effort lives in the side panel.
+      Click a marker to inspect it. Drag the hollow circle to set
+      urgency, the filled one to set impact, and the connecting segment
+      to shift effort left/right.
     </div>
   );
 }
