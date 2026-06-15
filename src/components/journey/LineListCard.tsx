@@ -39,8 +39,13 @@ export function LineListCard({
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const l of lines) {
-      const key = l.tagId ?? UNTAGGED;
-      m.set(key, (m.get(key) ?? 0) + 1);
+      if (l.tagIds.length === 0) {
+        m.set(UNTAGGED, (m.get(UNTAGGED) ?? 0) + 1);
+      } else {
+        for (const id of l.tagIds) {
+          m.set(id, (m.get(id) ?? 0) + 1);
+        }
+      }
     }
     return m;
   }, [lines]);
@@ -67,7 +72,11 @@ export function LineListCard({
   };
 
   const filtered = activeFilters.size
-    ? lines.filter((l) => activeFilters.has(l.tagId ?? UNTAGGED))
+    ? lines.filter((l) =>
+        l.tagIds.length === 0
+          ? activeFilters.has(UNTAGGED)
+          : l.tagIds.some((id) => activeFilters.has(id)),
+      )
     : lines;
 
   return (

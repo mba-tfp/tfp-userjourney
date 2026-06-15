@@ -18,7 +18,7 @@ type Props = {
   lineCounts?: Record<string, number>;
   onSelect: (id: string) => void;
   onRename?: (id: string, patch: Partial<Stage>) => void;
-  onValueChange?: (id: string, valueTagId: string | undefined) => void;
+  onValueChange?: (id: string, valueTagIds: string[]) => void;
   onManageValueTags?: () => void;
   onToggleOnFire: (id: string) => void;
   onMove: (id: string, dir: -1 | 1) => void;
@@ -59,9 +59,11 @@ export function StageLifecycle({
     ? stages.findIndex((s) => s.id === selectedStageId)
     : -1;
   const selected = selectedIndex >= 0 ? stages[selectedIndex] : null;
-  const selectedValueTag = selected
-    ? valueTags.find((t) => t.id === selected.valueTagId)
-    : null;
+  const selectedValueTagList = selected
+    ? selected.valueTagIds
+        .map((id) => valueTags.find((t) => t.id === id))
+        .filter((t): t is Tag => !!t)
+    : [];
 
   const labelOffset = nodeSize / 2 + 18;
 
@@ -156,13 +158,17 @@ export function StageLifecycle({
               <span className="text-[10px] font-mono tracking-[0.22em] text-muted-foreground">
                 STAGE {String(selectedIndex + 1).padStart(2, "0")} / {String(n).padStart(2, "0")}
               </span>
-              {selectedValueTag ? (
-                <span className="inline-flex items-center gap-1.5 text-[10.5px] tracking-[0.18em] uppercase text-foreground/80">
-                  <span
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: selectedValueTag.color }}
-                  />
-                  {selectedValueTag.name}
+              {selectedValueTagList.length > 0 ? (
+                <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10.5px] tracking-[0.18em] uppercase text-foreground/80">
+                  {selectedValueTagList.map((vt) => (
+                    <span key={vt.id} className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: vt.color }}
+                      />
+                      {vt.name}
+                    </span>
+                  ))}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 text-[10.5px] tracking-[0.18em] uppercase text-muted-foreground/70">
@@ -197,7 +203,9 @@ export function StageLifecycle({
         const active = s.id === selectedStageId;
         const dim = !!selectedStageId && !active;
         const onFire = showMoneyOnFire && !!s.onFire;
-        const valueTag = valueTags.find((t) => t.id === s.valueTagId);
+        const stageValueTags = s.valueTagIds
+          .map((id) => valueTags.find((t) => t.id === id))
+          .filter((t): t is Tag => !!t);
         const isEmpty = !!lineCounts && (lineCounts[s.id] ?? 0) === 0;
 
         const labelDx = Math.cos(angle) * labelOffset;
@@ -234,7 +242,7 @@ export function StageLifecycle({
                 dim={dim}
                 onFire={onFire}
                 isEmpty={isEmpty}
-                valueColor={valueTag?.color}
+                valueColors={stageValueTags.map((t) => t.color)}
                 onSelect={() => onSelect(s.id)}
                 onToggleOnFire={() => onToggleOnFire(s.id)}
                 onMove={(dir) => onMove(s.id, dir)}
@@ -285,7 +293,7 @@ type NodeProps = {
   dim: boolean;
   onFire: boolean;
   isEmpty?: boolean;
-  valueColor?: string;
+  valueColors?: string[];
   onSelect: () => void;
   onToggleOnFire: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -300,7 +308,7 @@ function StageNode({
   dim,
   onFire,
   isEmpty,
-  valueColor,
+  valueColors,
   onSelect,
   onToggleOnFire,
   onMove,
@@ -340,12 +348,19 @@ function StageNode({
         >
           {String(index + 1).padStart(2, "0")}
         </span>
-        {valueColor ? (
+        {valueColors && valueColors.length > 0 ? (
           <span
-            className="absolute -bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full ring-2 ring-background"
-            style={{ backgroundColor: valueColor }}
+            className="absolute -bottom-0.5 right-0.5 flex items-center gap-0.5"
             aria-hidden="true"
-          />
+          >
+            {valueColors.slice(0, 3).map((c, i) => (
+              <span
+                key={i}
+                className="h-1.5 w-1.5 rounded-full ring-2 ring-background"
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </span>
         ) : (
           <span
             className="absolute -bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full border border-muted-foreground/40 bg-background ring-2 ring-background"
