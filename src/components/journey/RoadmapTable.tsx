@@ -23,7 +23,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { Flame, GripVertical, Plus, Trash2, X } from "lucide-react";
 import { EditableText } from "./EditableText";
 import { TagPicker } from "./TagPicker";
-import { TAG_DOT } from "./tag-colors";
 import { useJourney } from "@/lib/journey-store";
 import { type Line, type Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
@@ -521,6 +520,3 @@ function DraggableLine({
     </li>
   );
 }
-
-// (color swatch removed — no tag rows in bucket layout)
-void TAG_DOT;
