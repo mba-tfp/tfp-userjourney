@@ -1,53 +1,49 @@
-# Make the Roadmap fully editable
+## Goal
 
-Bring the `/conclusion` table to feature parity with the main map: inline edits, add/delete, and drag-and-drop for stages (columns), tags (rows), and lines (cells).
+Treat **Exists Today / Doesn't Exist Today** as a true bucket on the conclusion roadmap, not as tags. Add a leading "Status" column on the left; each line lives in exactly one of the two status rows per stage, driven by the existing `line.exists` boolean. Tags become an orthogonal per-line attribute (shown as pills on the line), not row groupings.
 
-## What you'll be able to do
+## Roadmap layout (new)
 
-**Column headers (stages)**
-- Edit emoji, title, subtitle inline (existing `EditableText`)
-- Change value tag and toggle Money-on-fire (existing `TagPicker` + flame button)
-- Drag a column left/right to reorder stages
-- Add stage (➕ button at end of header row) and delete stage (× on hover)
+```text
+            │ Stage 1 │ Stage 2 │ Stage 3 │ ...
+────────────┼─────────┼─────────┼─────────┼────
+Exists      │ lines…  │ lines…  │ lines…  │
+Today       │         │         │         │
+────────────┼─────────┼─────────┼─────────┼────
+Doesn't     │ lines…  │ lines…  │ lines…  │
+Exist Today │         │         │         │
+```
 
-**Row headers (tags)**
-- Edit tag name inline; change color via the existing color popover
-- Drag a row up/down to reorder tags
-- Add tag (➕ row at bottom) and delete tag (× on hover, with confirm)
+- Two fixed rows. No tag rows, no Untagged row.
+- Each line cell shows its text + tag pills (click pill area to add/remove tags via `TagPicker`).
+- Drag a line between the two status rows → flips `exists`.
+- Drag a line between cells in the same row → moves stage.
+- Stage columns still drag-reorder horizontally.
+- "Add line" button per cell creates a line with the right `exists` value.
 
-**Cells (stage × tag)**
-- Each line is editable inline (text)
-- Toggle a line between "exists" / "gap" (small pill, same styling as today)
-- Delete a line (× on hover)
-- Add a line directly in the cell (➕ button at the bottom of each cell — defaults to `exists: true`, pre-tagged with this row's tag and assigned to this column's stage)
-- Drag a line to another cell. Dropping into a different **column** moves it to that stage; dropping into a different **row** swaps its tag for that row's tag. Dropping in the same cell reorders within the cell.
+## One-time migration
 
-**Toolbar**
-- Same masthead pattern as JourneyMap: Tags, Map (back), Add stage, Money-on-fire toggle, Sign out.
+On doc load (inside `normalize` in `src/lib/journey-store.ts`):
+1. Find tag ids whose `name` (case-insensitive, trimmed) is `"What Exists Today"` or `"What Doesn't Exist Today"` (also accept "Doesn't Exist Today" / "Does Not Exist Today").
+2. For every line, if it carries the "exists" tag → set `exists = true` and strip that tag id. If it carries the "doesn't exist" tag → set `exists = false` and strip it.
+3. Remove those tag entries from `doc.tags`.
+4. Also strip them from any stage's `valueTagIds` defensively.
 
-## Technical details
+Migration runs once per load; because results are saved through the existing debounced save, the cleaned doc persists.
 
-Library: `@dnd-kit/core` + `@dnd-kit/sortable` (already installed — used by `SortableTagPill`).
+## Seed cleanup
 
-New store actions in `src/lib/journey-store.ts`:
-- `reorderStages(nextOrder: string[])` — mirrors `reorderTags`
-- `moveLineToCell(fromStageId, lineId, toStageId, toTagId?, toIndex?)` — pops the line from `lines[fromStageId]`, sets/replaces its single-tag-for-this-row (replace the row's old tag id with `toTagId` if provided, otherwise keep tags as is), and inserts into `lines[toStageId]` at `toIndex`. Cell membership is derived from `line.tagIds.includes(rowTagId)`, so changing tag = changing row.
-
-New component file: `src/components/journey/RoadmapTable.tsx`
-- Wraps the table in a single `DndContext` with `closestCenter` + a custom collision strategy that prefers cell drop targets, then column targets, then row targets.
-- Three `SortableContext`s: stages (horizontal), tags (vertical), and one per-cell list of lines.
-- `useDraggable` on the column-header drag handle and row-header drag handle; `useSortable` on lines inside cells.
-- Drop zones: each `<td>` is a droppable with id `cell:{stageId}:{tagId}`; column headers expose `col:{stageId}`; row headers expose `row:{tagId}`.
-- `onDragEnd` dispatches to `reorderStages` / `reorderTags` / `moveLineToCell` based on the active+over ids.
-
-Update `src/routes/_authenticated/conclusion.tsx` to render `<RoadmapTable />` plus the existing summary strip and Back-to-map link. Keep the sticky headers and current visual styling (tag pills, value pill, on-fire chip, dashed gap styling).
-
-Reuse existing primitives: `EditableText`, `TagPicker` (for value tag on stage headers and for line tag chips), the color popover currently used in the Tags page (extract into a small `TagColorPopover` if it isn't already a standalone component — otherwise inline a minimal version).
-
-No schema, server-function, or routing changes. Persistence keeps working through the existing `useJourney()` debounced save.
+In `src/lib/journey-data.ts`:
+- Drop `{ name: "What Exists Today", color: "slate" }` from `tagDefs`.
+- In `sourceRows`, the rows tagged "What Exists Today" become lines with `gap: false` (already the default) and **no** tag → they'll fall into the Exists row purely via the bucket. Other tagged rows (Patient/Clinic/TFP/Channel) keep their tags.
 
 ## Files
 
-- edit `src/lib/journey-store.ts` — add `reorderStages` and `moveLineToCell`
-- new `src/components/journey/RoadmapTable.tsx` — DnD-aware editable table
-- edit `src/routes/_authenticated/conclusion.tsx` — swap the static table for `<RoadmapTable />`, keep header/summary
+- **edit** `src/lib/journey-data.ts` — remove the seeded tag; adjust seed rows that referenced it so those lines simply have no tag (still `exists: true`).
+- **edit** `src/lib/journey-store.ts` — add migration step in `normalize` (runs for both freshly loaded and seeded docs); no new store actions needed — `moveLineToCell` already supports `toTagId: null`, and we'll add a tiny `setLineExists(stageId, lineId, exists)` helper for the cross-bucket drag.
+- **edit** `src/components/journey/RoadmapTable.tsx` — replace tag-row layout with two fixed status rows; remove `UNTAGGED`/`rowTags` logic; render tag pills inline on each line (reuse `TagPicker` in a popover trigger); update DnD to use row ids `row:exists` / `row:gap` and cell ids `cell:{stageId}:{exists|gap}`; update `onDragEnd` to call `setLineExists` + `moveLineToCell` accordingly.
+- **no change** to `JourneyMap.tsx`, tags page, schema, or server functions.
+
+## Out of scope
+
+Map view (`/`) keeps its current Exists/Gap split — already bucket-shaped there. Tag management page is untouched; users can still create/edit/delete other tags.

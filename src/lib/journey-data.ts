@@ -83,7 +83,6 @@ export const TAG_COLORS = [
 export type TagColor = (typeof TAG_COLORS)[number];
 
 const tagDefs: { name: string; color: TagColor }[] = [
-  { name: "What Exists Today", color: "slate" },
   { name: "Patient", color: "rose" },
   { name: "Clinic", color: "amber" },
   { name: "TFP", color: "blue" },

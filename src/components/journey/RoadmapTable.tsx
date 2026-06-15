@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -16,37 +16,27 @@ import {
   SortableContext,
   arrayMove,
   horizontalListSortingStrategy,
-  verticalListSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  ArrowLeftRight,
-  Flame,
-  GripVertical,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Flame, GripVertical, Plus, Trash2, X } from "lucide-react";
 import { EditableText } from "./EditableText";
 import { TagPicker } from "./TagPicker";
-import { TAG_DOT, TAG_PILL } from "./tag-colors";
 import { useJourney } from "@/lib/journey-store";
-import { TAG_COLORS, type Line, type Tag, type TagColor } from "@/lib/journey-data";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { type Line, type Tag } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
-
-const UNTAGGED = "__untagged__";
 
 type Props = {
   showMoneyOnFire: boolean;
   onManageTags: () => void;
 };
+
+type Bucket = "exists" | "gap";
+const BUCKETS: { key: Bucket; label: string; sub: string }[] = [
+  { key: "exists", label: "What Exists Today", sub: "Live, in production" },
+  { key: "gap", label: "What Doesn't Exist Today", sub: "Gaps & opportunities" },
+];
 
 export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
   const j = useJourney();
@@ -54,39 +44,31 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
 
   const [active, setActive] = useState<
     | { type: "stage"; id: string }
-    | { type: "tag"; id: string }
-    | { type: "line"; stageId: string; tagId: string | null; lineId: string }
+    | {
+        type: "line";
+        stageId: string;
+        bucket: Bucket;
+        lineId: string;
+      }
     | null
   >(null);
-
-  const hasUntagged = useMemo(() => {
-    for (const sid of Object.keys(doc.lines))
-      for (const l of doc.lines[sid]) if (l.tagIds.length === 0) return true;
-    return false;
-  }, [doc.lines]);
-
-  const rowTags: (Tag | { id: typeof UNTAGGED; name: string; color: TagColor })[] =
-    hasUntagged
-      ? [...doc.tags, { id: UNTAGGED, name: "Untagged", color: "slate" as TagColor }]
-      : doc.tags;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const linesForCell = (stageId: string, tagId: string) =>
+  const linesForCell = (stageId: string, bucket: Bucket): Line[] =>
     (doc.lines[stageId] ?? []).filter((l) =>
-      tagId === UNTAGGED ? l.tagIds.length === 0 : l.tagIds.includes(tagId),
+      bucket === "exists" ? l.exists : !l.exists,
     );
 
   const onDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id);
     if (id.startsWith("stage:")) setActive({ type: "stage", id: id.slice(6) });
-    else if (id.startsWith("tag:")) setActive({ type: "tag", id: id.slice(4) });
     else if (id.startsWith("line:")) {
-      const [, stageId, tagId, lineId] = id.split(":");
-      setActive({ type: "line", stageId, tagId: tagId === UNTAGGED ? null : tagId, lineId });
+      const [, stageId, bucket, lineId] = id.split(":");
+      setActive({ type: "line", stageId, bucket: bucket as Bucket, lineId });
     }
   };
 
@@ -103,28 +85,15 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
       if (oi >= 0 && ni >= 0) j.reorderStages(arrayMove(ids, oi, ni));
       return;
     }
-    if (a.startsWith("tag:") && o.startsWith("tag:")) {
-      const aId = a.slice(4);
-      const oId = o.slice(4);
-      if (aId === UNTAGGED || oId === UNTAGGED) return;
-      const ids = doc.tags.map((t) => t.id);
-      const oi = ids.indexOf(aId);
-      const ni = ids.indexOf(oId);
-      if (oi >= 0 && ni >= 0) j.reorderTags(arrayMove(ids, oi, ni));
-      return;
-    }
     if (a.startsWith("line:") && o.startsWith("cell:")) {
-      const [, fromStageId, fromTagRaw, lineId] = a.split(":");
-      const [, toStageId, toTagRaw] = o.split(":");
-      const fromTagId = fromTagRaw === UNTAGGED ? null : fromTagRaw;
-      const toTagId = toTagRaw === UNTAGGED ? null : toTagRaw;
-      if (fromStageId === toStageId && fromTagId === toTagId) return;
+      const [, fromStageId, fromBucket, lineId] = a.split(":");
+      const [, toStageId, toBucket] = o.split(":");
+      if (fromStageId === toStageId && fromBucket === toBucket) return;
       j.moveLineToCell({
         fromStageId,
         lineId,
         toStageId,
-        fromTagId,
-        toTagId,
+        exists: toBucket === "exists",
       });
     }
   };
@@ -135,8 +104,6 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
   })();
   const activeStage =
     active?.type === "stage" ? doc.stages.find((s) => s.id === active.id) : null;
-  const activeTag =
-    active?.type === "tag" ? doc.tags.find((t) => t.id === active.id) : null;
 
   return (
     <DndContext
@@ -151,7 +118,7 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
           <thead>
             <tr>
               <th className="sticky left-0 top-0 z-30 bg-secondary/70 backdrop-blur border-b border-r border-border p-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground min-w-[180px]">
-                Tag \ Stage
+                Status \ Stage
               </th>
               <SortableContext
                 items={doc.stages.map((s) => `stage:${s.id}`)}
@@ -186,47 +153,24 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
             </tr>
           </thead>
           <tbody>
-            <SortableContext
-              items={rowTags.map((t) => `tag:${t.id}`)}
-              strategy={verticalListSortingStrategy}
-            >
-              {rowTags.map((t) => (
-                <TagRow
-                  key={t.id}
-                  tag={t as Tag}
-                  isUntagged={t.id === UNTAGGED}
-                  stages={doc.stages}
-                  tags={doc.tags}
-                  linesForCell={(stageId) => linesForCell(stageId, t.id)}
-                  showMoneyOnFire={showMoneyOnFire}
-                  onRename={(name) => j.renameTag(t.id, name)}
-                  onColor={(c) => j.setTagColor(t.id, c)}
-                  onDelete={() => {
-                    if (confirm(`Delete tag "${t.name}"? Lines keep their other tags.`))
-                      j.deleteTag(t.id);
-                  }}
-                  onUpdateLine={(stageId, lineId, patch) =>
-                    j.updateLine(stageId, lineId, patch)
-                  }
-                  onDeleteLine={(stageId, lineId) => j.deleteLine(stageId, lineId)}
-                  onAddLine={(stageId) => {
-                    j.addLineInCell(stageId, t.id === UNTAGGED ? null : t.id);
-                  }}
-                  onManageTags={onManageTags}
-                />
-              ))}
-            </SortableContext>
-            <tr>
-              <td className="sticky left-0 z-10 bg-secondary/40 border-r border-border p-2 min-w-[180px]">
-                <button
-                  onClick={() => j.addTag()}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add tag
-                </button>
-              </td>
-              <td colSpan={doc.stages.length + 1} className="bg-secondary/10" />
-            </tr>
+            {BUCKETS.map((b) => (
+              <BucketRow
+                key={b.key}
+                bucket={b.key}
+                label={b.label}
+                sub={b.sub}
+                stages={doc.stages}
+                tags={doc.tags}
+                linesForCell={(stageId) => linesForCell(stageId, b.key)}
+                showMoneyOnFire={showMoneyOnFire}
+                onUpdateLine={(stageId, lineId, patch) =>
+                  j.updateLine(stageId, lineId, patch)
+                }
+                onDeleteLine={(stageId, lineId) => j.deleteLine(stageId, lineId)}
+                onAddLine={(stageId) => j.addLine(stageId, b.key === "exists")}
+                onManageTags={onManageTags}
+              />
+            ))}
           </tbody>
         </table>
       </div>
@@ -247,15 +191,6 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
           <div className="rounded-md border border-border bg-card px-3 py-2 text-sm font-semibold shadow-lg">
             {activeStage.emoji} {activeStage.title}
           </div>
-        ) : activeTag ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-lg",
-              TAG_PILL[activeTag.color as TagColor],
-            )}
-          >
-            {activeTag.name}
-          </span>
         ) : null}
       </DragOverlay>
     </DndContext>
@@ -374,98 +309,61 @@ function StageHeader({
   );
 }
 
-// ---- Tag row ----
+// ---- Bucket row (Exists / Gap) ----
 
-function TagRow({
-  tag,
-  isUntagged,
+function BucketRow({
+  bucket,
+  label,
+  sub,
   stages,
   tags,
   linesForCell,
   showMoneyOnFire,
-  onRename,
-  onColor,
-  onDelete,
   onUpdateLine,
   onDeleteLine,
   onAddLine,
   onManageTags,
 }: {
-  tag: Tag;
-  isUntagged: boolean;
+  bucket: Bucket;
+  label: string;
+  sub: string;
   stages: import("@/lib/journey-data").Stage[];
   tags: Tag[];
   linesForCell: (stageId: string) => Line[];
   showMoneyOnFire: boolean;
-  onRename: (name: string) => void;
-  onColor: (c: TagColor) => void;
-  onDelete: () => void;
   onUpdateLine: (stageId: string, lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (stageId: string, lineId: string) => void;
   onAddLine: (stageId: string) => void;
   onManageTags: () => void;
 }) {
-  const id = `tag:${tag.id}`;
-  const sortable = useSortable({ id, disabled: isUntagged });
-  const style = {
-    transform: CSS.Transform.toString(sortable.transform),
-    transition: sortable.transition,
-    opacity: sortable.isDragging ? 0.5 : 1,
-  };
-
+  const isGap = bucket === "gap";
   return (
-    <tr ref={sortable.setNodeRef} style={style} className="align-top group/row">
+    <tr className="align-top">
       <th
         scope="row"
         className={cn(
-          "sticky left-0 z-10 bg-secondary/70 backdrop-blur border-b border-r border-border p-3 text-left min-w-[180px]",
-          sortable.isDragging && "shadow-lg",
+          "sticky left-0 z-10 backdrop-blur border-b border-r border-border p-3 text-left min-w-[180px]",
+          isGap ? "bg-destructive/[0.06]" : "bg-secondary/70",
         )}
       >
-        <div className="flex items-center gap-1.5">
-          {!isUntagged && (
-            <button
-              {...sortable.attributes}
-              {...sortable.listeners}
-              title="Drag to reorder tag"
-              className="p-1 -ml-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
-            >
-              <GripVertical className="h-4 w-4" />
-            </button>
-          )}
-          {!isUntagged ? (
-            <ColorSwatch color={tag.color as TagColor} onChange={onColor} />
-          ) : (
-            <span className={cn("h-3 w-3 rounded-full", TAG_DOT.slate)} />
-          )}
-          {isUntagged ? (
-            <span className="text-xs font-medium italic text-muted-foreground">
-              Untagged
-            </span>
-          ) : (
-            <EditableText
-              value={tag.name}
-              onChange={onRename}
-              className="text-xs font-semibold flex-1"
-            />
-          )}
-          {!isUntagged && (
-            <button
-              onClick={onDelete}
-              title="Delete tag"
-              className="opacity-0 group-hover/row:opacity-100 p-1 text-muted-foreground hover:text-destructive transition"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
-          )}
+        <div className="flex flex-col gap-0.5">
+          <span
+            className={cn(
+              "text-[10px] font-semibold uppercase tracking-wider",
+              isGap ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {isGap ? "Gap" : "Exists"}
+          </span>
+          <span className="text-sm font-semibold leading-tight">{label}</span>
+          <span className="text-[11px] text-muted-foreground">{sub}</span>
         </div>
       </th>
       {stages.map((s) => (
         <Cell
           key={s.id}
           stageId={s.id}
-          tagId={tag.id}
-          isUntagged={isUntagged}
+          bucket={bucket}
           fire={showMoneyOnFire && !!s.onFire}
           lines={linesForCell(s.id)}
           tags={tags}
@@ -475,7 +373,12 @@ function TagRow({
           onManageTags={onManageTags}
         />
       ))}
-      <td className="bg-secondary/5 border-b border-border" />
+      <td
+        className={cn(
+          "border-b border-border",
+          isGap ? "bg-destructive/[0.02]" : "bg-secondary/5",
+        )}
+      />
     </tr>
   );
 }
@@ -484,8 +387,7 @@ function TagRow({
 
 function Cell({
   stageId,
-  tagId,
-  isUntagged,
+  bucket,
   fire,
   lines,
   tags,
@@ -495,8 +397,7 @@ function Cell({
   onManageTags,
 }: {
   stageId: string;
-  tagId: string;
-  isUntagged: boolean;
+  bucket: Bucket;
   fire: boolean;
   lines: Line[];
   tags: Tag[];
@@ -506,15 +407,17 @@ function Cell({
   onManageTags: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: `cell:${stageId}:${tagId}`,
+    id: `cell:${stageId}:${bucket}`,
   });
+  const isGap = bucket === "gap";
 
   return (
     <td
       ref={setNodeRef}
       className={cn(
         "border-b border-r border-border p-2 align-top min-w-[280px] max-w-[320px] transition-colors",
-        fire && "bg-destructive/[0.03]",
+        isGap && "bg-destructive/[0.02]",
+        fire && "bg-destructive/[0.05]",
         isOver && "bg-primary/10 ring-2 ring-inset ring-primary/40",
       )}
     >
@@ -524,12 +427,11 @@ function Cell({
             key={l.id}
             line={l}
             stageId={stageId}
-            tagId={tagId}
+            bucket={bucket}
             tags={tags}
             onUpdate={(patch) => onUpdateLine(l.id, patch)}
             onDelete={() => onDeleteLine(l.id)}
             onManageTags={onManageTags}
-            isUntagged={isUntagged}
           />
         ))}
       </ul>
@@ -548,24 +450,22 @@ function Cell({
 function DraggableLine({
   line,
   stageId,
-  tagId,
+  bucket,
   tags,
   onUpdate,
   onDelete,
   onManageTags,
-  isUntagged,
 }: {
   line: Line;
   stageId: string;
-  tagId: string;
+  bucket: Bucket;
   tags: Tag[];
   onUpdate: (patch: Partial<Line>) => void;
   onDelete: () => void;
   onManageTags: () => void;
-  isUntagged: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `line:${stageId}:${tagId}:${line.id}`,
+    id: `line:${stageId}:${bucket}:${line.id}`,
   });
   const style = transform
     ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 }
@@ -598,26 +498,17 @@ function DraggableLine({
             onChange={(text) => onUpdate({ text })}
             placeholder="Add a note…"
           />
-          {!isUntagged && (
-            <div className="mt-1">
-              <TagPicker
-                tags={tags}
-                values={line.tagIds}
-                onChange={(tagIds) => onUpdate({ tagIds })}
-                onManage={onManageTags}
-              />
-            </div>
-          )}
+          <div className="mt-1">
+            <TagPicker
+              tags={tags}
+              values={line.tagIds}
+              onChange={(tagIds) => onUpdate({ tagIds })}
+              onManage={onManageTags}
+            />
+          </div>
         </div>
       </div>
       <div className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 group-hover/line:opacity-100 transition">
-        <button
-          title={line.exists ? "Mark as gap" : "Mark as exists"}
-          onClick={() => onUpdate({ exists: !line.exists })}
-          className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
-        >
-          <ArrowLeftRight className="h-3 w-3" />
-        </button>
         <button
           title="Delete line"
           onClick={onDelete}
@@ -627,47 +518,5 @@ function DraggableLine({
         </button>
       </div>
     </li>
-  );
-}
-
-// ---- Color swatch (same UX as the Tags page) ----
-
-function ColorSwatch({
-  color,
-  onChange,
-}: {
-  color: TagColor;
-  onChange: (c: TagColor) => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          aria-label={`Tag color: ${color}`}
-          className={cn(
-            "h-3.5 w-3.5 rounded-full ring-2 ring-offset-1 ring-offset-background ring-border hover:ring-foreground/60 transition shrink-0",
-            TAG_DOT[color],
-          )}
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="p-2">
-        <div className="grid grid-cols-4 gap-1.5">
-          {TAG_COLORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => onChange(c)}
-              aria-label={c}
-              className={cn(
-                "h-6 w-6 rounded-full transition",
-                TAG_DOT[c],
-                color === c
-                  ? "ring-2 ring-offset-1 ring-foreground/70"
-                  : "opacity-70 hover:opacity-100",
-              )}
-            />
-          ))}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
