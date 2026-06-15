@@ -5,6 +5,11 @@ export type Line = {
   text: string;
   tagIds: string[];
   exists: boolean;
+  // Prioritization scores (1–5) used in the quadrant view. Optional —
+  // auto-seeded by the store on load when missing.
+  impact?: number;
+  urgency?: number;
+  effort?: number;
 };
 
 export type Stage = {
