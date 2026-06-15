@@ -19,36 +19,33 @@ const HEX: Record<TagColor, string> = {
 
 type Pt = { x: number; y: number };
 
-// 2D scatter board. X = Urgency (1..5), Y = Impact (1..5, top is high).
-// Effort is encoded as bubble radius (smaller effort = smaller bubble).
+// 2D board. X = Effort (1..5). Dual Y axes on the same 0–100 scale:
+// left axis = Urgency, right axis = Impact. Each item is rendered as
+// a vertical segment from its urgency point (left-side marker) to its
+// impact point (right-side marker) at x = effort.
 const VIEW_W = 940;
 const VIEW_H = 640;
 const PAD_L = 70;
-const PAD_R = 30;
+const PAD_R = 70;
 const PAD_T = 40;
 const PAD_B = 60;
 const PLOT_W = VIEW_W - PAD_L - PAD_R;
 const PLOT_H = VIEW_H - PAD_T - PAD_B;
 
-function project(impact: number, urgency: number): Pt {
-  const u = Math.max(1, Math.min(5, urgency));
-  const i = Math.max(1, Math.min(5, impact));
-  return {
-    x: PAD_L + ((u - 1) / 4) * PLOT_W,
-    y: PAD_T + ((5 - i) / 4) * PLOT_H,
-  };
-}
-
-function unproject(p: Pt): { impact: number; urgency: number } {
-  const urgency = 1 + ((p.x - PAD_L) / PLOT_W) * 4;
-  const impact = 5 - ((p.y - PAD_T) / PLOT_H) * 4;
-  return { impact, urgency };
-}
-
-function effortRadius(effort: number) {
+// Map a 1..5 score to a pixel coordinate along an axis.
+function xForEffort(effort: number) {
   const e = Math.max(1, Math.min(5, effort));
-  // 8..22 px
-  return 8 + ((e - 1) / 4) * 14;
+  return PAD_L + ((e - 1) / 4) * PLOT_W;
+}
+function yForScore(score: number) {
+  const s = Math.max(1, Math.min(5, score));
+  return PAD_T + ((5 - s) / 4) * PLOT_H;
+}
+function effortFromX(x: number) {
+  return 1 + ((x - PAD_L) / PLOT_W) * 4;
+}
+function scoreFromY(y: number) {
+  return 5 - ((y - PAD_T) / PLOT_H) * 4;
 }
 
 function hash(s: string) {
@@ -60,7 +57,10 @@ function hash(s: string) {
 type Plotted = {
   line: Line;
   stage: Stage;
-  pt: Pt;
+  x: number;
+  yImpact: number;
+  yUrgency: number;
+  jitter: number;
   color: TagColor;
 };
 
@@ -100,15 +100,26 @@ export function QuadrantBoard() {
         if (l.exists) continue;
         const imp = l.impact ?? 3;
         const urg = l.urgency ?? 3;
-        let pt = project(imp, urg);
-        // Deterministic jitter to avoid full overlap.
+        const eff = l.effort ?? 3;
+        // Deterministic horizontal jitter so items at the same effort don't fully overlap.
         const h = hash(l.id);
-        pt = { x: pt.x + ((h % 13) - 6), y: pt.y + (((h >> 4) % 13) - 6) };
-        out.push({ line: l, stage: s, pt, color });
+        const jitter = ((h % 21) - 10); // -10..+10 px
+        out.push({
+          line: l,
+          stage: s,
+          x: xForEffort(eff) + jitter,
+          yImpact: yForScore(imp),
+          yUrgency: yForScore(urg),
+          jitter,
+          color,
+        });
       }
     }
-    // Bigger bubbles first so smaller ones stay clickable on top.
-    out.sort((a, b) => (b.line.effort ?? 3) - (a.line.effort ?? 3));
+    // Longer segments (bigger gap between urgency & impact) painted first so short ones land on top.
+    out.sort(
+      (a, b) =>
+        Math.abs(b.yImpact - b.yUrgency) - Math.abs(a.yImpact - a.yUrgency),
+    );
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.stages, doc.lines, doc.valueTags, stageFilter, valueFilter]);
@@ -118,6 +129,7 @@ export function QuadrantBoard() {
   const [drag, setDrag] = useState<{
     stageId: string;
     lineId: string;
+    mode: "impact" | "urgency" | "effort";
   } | null>(null);
 
   const toSvgPt = (evt: { clientX: number; clientY: number }): Pt | null => {
@@ -137,8 +149,20 @@ export function QuadrantBoard() {
     const onMove = (e: PointerEvent) => {
       const p = toSvgPt(e);
       if (!p) return;
-      const { impact, urgency } = unproject(p);
-      j.setLineScores(drag.stageId, drag.lineId, { impact, urgency });
+      const effort = effortFromX(p.x);
+      if (drag.mode === "impact") {
+        j.setLineScores(drag.stageId, drag.lineId, {
+          effort,
+          impact: scoreFromY(p.y),
+        });
+      } else if (drag.mode === "urgency") {
+        j.setLineScores(drag.stageId, drag.lineId, {
+          effort,
+          urgency: scoreFromY(p.y),
+        });
+      } else {
+        j.setLineScores(drag.stageId, drag.lineId, { effort });
+      }
     };
     const onUp = () => setDrag(null);
     window.addEventListener("pointermove", onMove);
@@ -162,7 +186,10 @@ export function QuadrantBoard() {
             return {
               line: l,
               stage: s,
-              pt: project(l.impact ?? 3, l.urgency ?? 3),
+              x: xForEffort(l.effort ?? 3),
+              yImpact: yForScore(l.impact ?? 3),
+              yUrgency: yForScore(l.urgency ?? 3),
+              jitter: 0,
               color: (valueTag?.color as TagColor) ?? "slate",
             };
           }
@@ -228,57 +255,89 @@ export function QuadrantBoard() {
             </defs>
 
             <Grid />
-            <QuadrantLabels />
             <AxisLabels />
 
-            {/* Dots */}
+            {/* Segments: urgency (left marker) ↔ impact (right marker) at x = effort */}
             {dots.map((d) => {
               const isOnFire = !!d.stage.onFire;
               const isSel = selectedId === d.line.id;
               const isHov = hoverId === d.line.id;
-              const r = effortRadius(d.line.effort ?? 3);
+              const r = 7;
+              const color = HEX[d.color];
+              const labelY = Math.min(d.yImpact, d.yUrgency) - 10;
               return (
                 <g
                   key={d.line.id}
-                  transform={`translate(${d.pt.x} ${d.pt.y})`}
-                  className="cursor-grab active:cursor-grabbing"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    (e.target as Element).setPointerCapture?.(e.pointerId);
-                    setSelectedId(d.line.id);
-                    setDrag({
-                      stageId: d.stage.id,
-                      lineId: d.line.id,
-                    });
-                  }}
                   onPointerEnter={() => setHoverId(d.line.id)}
                   onPointerLeave={() => setHoverId((h) => (h === d.line.id ? null : h))}
                 >
+                  {/* Connecting segment — drag to change Effort only */}
+                  <line
+                    x1={d.x}
+                    y1={d.yUrgency}
+                    x2={d.x}
+                    y2={d.yImpact}
+                    stroke={color}
+                    strokeOpacity={isSel || isHov ? 0.9 : 0.45}
+                    strokeWidth={isSel ? 3 : 2}
+                    strokeLinecap="round"
+                    className="cursor-ew-resize"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setSelectedId(d.line.id);
+                      setDrag({ stageId: d.stage.id, lineId: d.line.id, mode: "effort" });
+                    }}
+                  />
+                  {/* Urgency marker (left-axis side) — hollow */}
                   <circle
-                    r={r + 5}
-                    fill={HEX[d.color]}
-                    opacity={isSel ? 0.3 : isHov ? 0.18 : 0}
+                    cx={d.x}
+                    cy={d.yUrgency}
+                    r={r}
+                    fill="hsl(var(--background))"
+                    stroke={color}
+                    strokeWidth="2"
+                    className="cursor-grab active:cursor-grabbing"
+                    filter="url(#dotShadow)"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setSelectedId(d.line.id);
+                      setDrag({ stageId: d.stage.id, lineId: d.line.id, mode: "urgency" });
+                    }}
+                  />
+                  {/* Impact marker (right-axis side) — filled */}
+                  <circle
+                    cx={d.x}
+                    cy={d.yImpact}
+                    r={r}
+                    fill={color}
+                    fillOpacity="0.9"
+                    stroke="#fff"
+                    strokeWidth="1.5"
+                    className="cursor-grab active:cursor-grabbing"
+                    filter="url(#dotShadow)"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      (e.target as Element).setPointerCapture?.(e.pointerId);
+                      setSelectedId(d.line.id);
+                      setDrag({ stageId: d.stage.id, lineId: d.line.id, mode: "impact" });
+                    }}
                   />
                   {isOnFire && (
                     <circle
-                      r={r + 2}
+                      cx={d.x}
+                      cy={d.yImpact}
+                      r={r + 3}
                       fill="none"
                       stroke="hsl(var(--destructive))"
                       strokeWidth="1.5"
                     />
                   )}
-                  <circle
-                    r={r}
-                    fill={HEX[d.color]}
-                    fillOpacity="0.85"
-                    stroke="#fff"
-                    strokeWidth="1.5"
-                    filter="url(#dotShadow)"
-                  />
                   {(isSel || isHov) && (
                     <text
-                      x={r + 6}
-                      y={4}
+                      x={d.x + r + 6}
+                      y={labelY + 4}
                       className="fill-foreground"
                       fontSize="11"
                       fontWeight="600"
@@ -305,10 +364,10 @@ export function QuadrantBoard() {
           </svg>
 
           <div className="absolute top-3 left-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Priority Quadrant · Impact × Urgency · bubble = Effort
+            Priority Plot · Urgency (○) ↔ Impact (●) · X = Effort
           </div>
           <div className="absolute bottom-3 right-3 text-[10px] text-muted-foreground">
-            Drag dots to reposition · Adjust Effort in the side panel
+            Drag markers to set scores · Drag segment to shift Effort
           </div>
         </div>
       </div>
@@ -348,10 +407,12 @@ function truncate(s: string, n: number) {
 
 function Grid() {
   const lines: ReactElement[] = [];
-  for (let i = 0; i <= 4; i++) {
-    const x = PAD_L + (i / 4) * PLOT_W;
-    const y = PAD_T + (i / 4) * PLOT_H;
-    const edge = i === 0 || i === 4;
+  const STEPS = 10;
+  for (let i = 0; i <= STEPS; i++) {
+    const x = PAD_L + (i / STEPS) * PLOT_W;
+    const y = PAD_T + (i / STEPS) * PLOT_H;
+    const edge = i === 0 || i === STEPS;
+    const mid = i === STEPS / 2;
     lines.push(
       <line
         key={`v${i}`}
@@ -360,7 +421,7 @@ function Grid() {
         x2={x}
         y2={PAD_T + PLOT_H}
         stroke="hsl(var(--border))"
-        strokeOpacity={edge ? 0.9 : 0.3}
+        strokeOpacity={edge ? 0.9 : mid ? 0.45 : 0.2}
       />,
       <line
         key={`h${i}`}
@@ -369,84 +430,26 @@ function Grid() {
         x2={PAD_L + PLOT_W}
         y2={y}
         stroke="hsl(var(--border))"
-        strokeOpacity={edge ? 0.9 : 0.3}
+        strokeOpacity={edge ? 0.9 : mid ? 0.45 : 0.2}
       />,
     );
   }
-  // Midline crosshair (emphasis)
-  const midX = PAD_L + PLOT_W / 2;
-  const midY = PAD_T + PLOT_H / 2;
-  lines.push(
-    <line
-      key="midV"
-      x1={midX}
-      y1={PAD_T}
-      x2={midX}
-      y2={PAD_T + PLOT_H}
-      stroke="hsl(var(--foreground))"
-      strokeOpacity="0.35"
-      strokeWidth="1"
-    />,
-    <line
-      key="midH"
-      x1={PAD_L}
-      y1={midY}
-      x2={PAD_L + PLOT_W}
-      y2={midY}
-      stroke="hsl(var(--foreground))"
-      strokeOpacity="0.35"
-      strokeWidth="1"
-    />,
-  );
   return <g>{lines}</g>;
 }
 
-function QuadrantLabels() {
-  const x1 = PAD_L + PLOT_W * 0.25;
-  const x2 = PAD_L + PLOT_W * 0.75;
-  const y1 = PAD_T + PLOT_H * 0.25;
-  const y2 = PAD_T + PLOT_H * 0.75;
-  const items: { x: number; y: number; label: string; sub: string }[] = [
-    { x: x1, y: y1, label: "Big Bets", sub: "high impact · low urgency" },
-    { x: x2, y: y1, label: "Quick Wins", sub: "high impact · high urgency" },
-    { x: x1, y: y2, label: "Time Sinks", sub: "low impact · low urgency" },
-    { x: x2, y: y2, label: "Fill-ins", sub: "low impact · high urgency" },
-  ];
-  return (
-    <g className="fill-muted-foreground" textAnchor="middle">
-      {items.map((it) => (
-        <g key={it.label}>
-          <text
-            x={it.x}
-            y={it.y}
-            fontSize="13"
-            fontWeight="700"
-            opacity="0.45"
-            className="fill-foreground uppercase tracking-[0.18em]"
-          >
-            {it.label}
-          </text>
-          <text x={it.x} y={it.y + 14} fontSize="10" opacity="0.6">
-            {it.sub}
-          </text>
-        </g>
-      ))}
-    </g>
-  );
-}
-
 function AxisLabels() {
+  const midY = PAD_T + PLOT_H / 2;
   return (
     <g className="fill-muted-foreground" fontSize="11" fontWeight="600">
-      {/* Y axis: Impact */}
+      {/* Left axis: Urgency */}
       <text
         x={PAD_L - 14}
-        y={PAD_T + PLOT_H / 2}
+        y={midY}
         textAnchor="middle"
-        transform={`rotate(-90 ${PAD_L - 14} ${PAD_T + PLOT_H / 2})`}
+        transform={`rotate(-90 ${PAD_L - 14} ${midY})`}
         className="uppercase tracking-[0.18em]"
       >
-        Impact →
+        Urgency →
       </text>
       <text x={PAD_L - 10} y={PAD_T + 4} textAnchor="end" fontSize="10">
         High
@@ -454,14 +457,30 @@ function AxisLabels() {
       <text x={PAD_L - 10} y={PAD_T + PLOT_H} textAnchor="end" fontSize="10">
         Low
       </text>
-      {/* X axis: Urgency */}
+      {/* Right axis: Impact */}
+      <text
+        x={PAD_L + PLOT_W + 14}
+        y={midY}
+        textAnchor="middle"
+        transform={`rotate(90 ${PAD_L + PLOT_W + 14} ${midY})`}
+        className="uppercase tracking-[0.18em]"
+      >
+        Impact →
+      </text>
+      <text x={PAD_L + PLOT_W + 10} y={PAD_T + 4} fontSize="10">
+        High
+      </text>
+      <text x={PAD_L + PLOT_W + 10} y={PAD_T + PLOT_H} fontSize="10">
+        Low
+      </text>
+      {/* X axis: Effort */}
       <text
         x={PAD_L + PLOT_W / 2}
         y={VIEW_H - 18}
         textAnchor="middle"
         className="uppercase tracking-[0.18em]"
       >
-        Urgency →
+        Effort →
       </text>
       <text x={PAD_L} y={PAD_T + PLOT_H + 16} fontSize="10">
         Low
@@ -545,14 +564,21 @@ function Legend() {
       </div>
       <div>
         <span className="inline-block h-2 w-2 rounded-full align-middle bg-foreground mr-1.5" />
-        Dot color = stage value tag
+        Color = stage value tag
       </div>
-      <div>Bubble size = Effort (bigger = more effort)</div>
+      <div>
+        <span className="inline-block h-2 w-2 rounded-full align-middle border border-foreground mr-1.5" />
+        Hollow = Urgency (left axis)
+      </div>
+      <div>
+        <span className="inline-block h-2 w-2 rounded-full align-middle bg-foreground mr-1.5" />
+        Filled = Impact (right axis)
+      </div>
+      <div>X position = Effort (low → high)</div>
       <div className="flex items-center gap-1.5">
         <Flame className="h-3 w-3 text-destructive" />
         Red ring = stage is "Money on fire"
       </div>
-      <div>Top-right = Quick Wins · top-left = Big Bets</div>
     </div>
   );
 }
@@ -703,8 +729,9 @@ function EmptyPanel({ total }: { total: number }) {
       <div className="text-sm font-semibold text-foreground mb-1">
         {total} gap{total === 1 ? "" : "s"} plotted
       </div>
-      Click a bubble to inspect it, or drag bubbles around the grid to
-      re-prioritize. Effort lives in the side panel.
+      Click a marker to inspect it. Drag the hollow circle to set
+      urgency, the filled one to set impact, and the connecting segment
+      to shift effort left/right.
     </div>
   );
 }
