@@ -45,7 +45,7 @@ const valueTagSeed: Tag[] = [
 // Original indexes (0-based) that were flagged "money on fire"
 const ON_FIRE_INDEXES = new Set([2, 5, 8, 9, 10]);
 
-type StageSeed = Omit<Stage, "id" | "valueTagId" | "onFire"> & {
+type StageSeed = Omit<Stage, "id" | "valueTagIds" | "onFire"> & {
   value: keyof typeof VALUE_TAG_IDS;
 };
 const stageDefs: StageSeed[] = [
