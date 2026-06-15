@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   seedDoc,
   newId,
@@ -8,11 +9,7 @@ import {
   type Stage,
   type Tag,
 } from "./journey-data";
-
-const KEY = "otto-journey-doc-v4";
-const KEY_V3 = "otto-journey-doc-v3";
-const KEY_V2 = "otto-journey-doc-v2";
-const LEGACY_KEY = "otto-journey-doc-v1";
+import { loadJourney, saveJourney } from "./journey.functions";
 
 // v2 docs stored stage.value as "capacity" | "revenue" | "cost" and had no valueTags/onFire
 // Normalize any prior shape (v2 single value string, v3 single tagId/valueTagId)
@@ -56,38 +53,48 @@ function normalize(raw: any): JourneyDoc {
   };
 }
 
-function load(): JourneyDoc {
-  if (typeof window === "undefined") return seedDoc;
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return normalize(JSON.parse(raw));
-    // One-shot migrate from any previous version
-    const prior = localStorage.getItem(KEY_V3) ?? localStorage.getItem(KEY_V2);
-    if (prior) {
-      const migrated = normalize(JSON.parse(prior));
-      localStorage.setItem(KEY, JSON.stringify(migrated));
-      return migrated;
-    }
-    if (localStorage.getItem(LEGACY_KEY)) localStorage.removeItem(LEGACY_KEY);
-    return seedDoc;
-  } catch {
-    return seedDoc;
-  }
-}
-
 export function useJourney() {
   const [doc, setDoc] = useState<JourneyDoc>(seedDoc);
   const [hydrated, setHydrated] = useState(false);
+  const load = useServerFn(loadJourney);
+  const save = useServerFn(saveJourney);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setDoc(load());
-    setHydrated(true);
-  }, []);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { doc: stored } = await load();
+        if (cancelled) return;
+        if (stored) {
+          setDoc(normalize(stored));
+        } else {
+          setDoc(seedDoc);
+          // Seed the row so subsequent saves upsert cleanly.
+          await save({ data: { doc: seedDoc } });
+        }
+      } catch (e) {
+        console.error("Failed to load journey", e);
+        if (!cancelled) setDoc(seedDoc);
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [load, save]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(KEY, JSON.stringify(doc));
-  }, [doc, hydrated]);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      save({ data: { doc } }).catch((e) => console.error("Failed to save journey", e));
+    }, 600);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [doc, hydrated, save]);
 
   const update = useCallback((fn: (d: JourneyDoc) => JourneyDoc) => {
     setDoc((d) => fn(structuredClone(d)));
