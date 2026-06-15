@@ -7,7 +7,6 @@ import {
   Tag as TagIcon,
   Flame,
   ListChecks,
-  LayoutGrid,
   Undo2,
   Redo2,
 } from "lucide-react";
@@ -153,11 +152,6 @@ export function JourneyMap() {
                 <ListChecks className="h-4 w-4" />,
                 "Conclusion / Roadmap",
                 () => navigate({ to: "/conclusion" }),
-              )}
-              {tool(
-                <LayoutGrid className="h-4 w-4" />,
-                "Priority quadrant",
-                () => navigate({ to: "/quadrant" }),
               )}
               {tool(<Plus className="h-4 w-4" />, "Add stage", () => j.addStage())}
               <span className="mx-1 h-5 w-px bg-border" />

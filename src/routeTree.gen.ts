@@ -13,7 +13,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTagsRouteImport } from './routes/_authenticated/tags'
-import { Route as AuthenticatedQuadrantRouteImport } from './routes/_authenticated/quadrant'
 import { Route as AuthenticatedConclusionRouteImport } from './routes/_authenticated/conclusion'
 
 const AuthRoute = AuthRouteImport.update({
@@ -35,11 +34,6 @@ const AuthenticatedTagsRoute = AuthenticatedTagsRouteImport.update({
   path: '/tags',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedQuadrantRoute = AuthenticatedQuadrantRouteImport.update({
-  id: '/quadrant',
-  path: '/quadrant',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedConclusionRoute = AuthenticatedConclusionRouteImport.update({
   id: '/conclusion',
   path: '/conclusion',
@@ -50,13 +44,11 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/conclusion': typeof AuthenticatedConclusionRoute
-  '/quadrant': typeof AuthenticatedQuadrantRoute
   '/tags': typeof AuthenticatedTagsRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/conclusion': typeof AuthenticatedConclusionRoute
-  '/quadrant': typeof AuthenticatedQuadrantRoute
   '/tags': typeof AuthenticatedTagsRoute
   '/': typeof AuthenticatedIndexRoute
 }
@@ -65,21 +57,19 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/conclusion': typeof AuthenticatedConclusionRoute
-  '/_authenticated/quadrant': typeof AuthenticatedQuadrantRoute
   '/_authenticated/tags': typeof AuthenticatedTagsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/conclusion' | '/quadrant' | '/tags'
+  fullPaths: '/' | '/auth' | '/conclusion' | '/tags'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/conclusion' | '/quadrant' | '/tags' | '/'
+  to: '/auth' | '/conclusion' | '/tags' | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/conclusion'
-    | '/_authenticated/quadrant'
     | '/_authenticated/tags'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
@@ -119,13 +109,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTagsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/quadrant': {
-      id: '/_authenticated/quadrant'
-      path: '/quadrant'
-      fullPath: '/quadrant'
-      preLoaderRoute: typeof AuthenticatedQuadrantRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/conclusion': {
       id: '/_authenticated/conclusion'
       path: '/conclusion'
@@ -138,14 +121,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedConclusionRoute: typeof AuthenticatedConclusionRoute
-  AuthenticatedQuadrantRoute: typeof AuthenticatedQuadrantRoute
   AuthenticatedTagsRoute: typeof AuthenticatedTagsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConclusionRoute: AuthenticatedConclusionRoute,
-  AuthenticatedQuadrantRoute: AuthenticatedQuadrantRoute,
   AuthenticatedTagsRoute: AuthenticatedTagsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
