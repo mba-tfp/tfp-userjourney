@@ -6,6 +6,7 @@ import {
   X,
   Tag as TagIcon,
   Flame,
+  ListChecks,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
@@ -121,6 +122,11 @@ export function JourneyMap() {
             </div>
             <div className="flex items-center gap-1 pt-2">
               {tool(<TagIcon className="h-4 w-4" />, "Manage tags", openTagManager)}
+              {tool(
+                <ListChecks className="h-4 w-4" />,
+                "Conclusion / Roadmap",
+                () => navigate({ to: "/conclusion" }),
+              )}
               {tool(<Plus className="h-4 w-4" />, "Add stage", () => j.addStage())}
               <span className="mx-1 h-5 w-px bg-border" />
               <Tooltip>

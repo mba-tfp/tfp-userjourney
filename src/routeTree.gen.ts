@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTagsRouteImport } from './routes/_authenticated/tags'
+import { Route as AuthenticatedConclusionRouteImport } from './routes/_authenticated/conclusion'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -33,14 +34,21 @@ const AuthenticatedTagsRoute = AuthenticatedTagsRouteImport.update({
   path: '/tags',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedConclusionRoute = AuthenticatedConclusionRouteImport.update({
+  id: '/conclusion',
+  path: '/conclusion',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/conclusion': typeof AuthenticatedConclusionRoute
   '/tags': typeof AuthenticatedTagsRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/conclusion': typeof AuthenticatedConclusionRoute
   '/tags': typeof AuthenticatedTagsRoute
   '/': typeof AuthenticatedIndexRoute
 }
@@ -48,18 +56,20 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/conclusion': typeof AuthenticatedConclusionRoute
   '/_authenticated/tags': typeof AuthenticatedTagsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/tags'
+  fullPaths: '/' | '/auth' | '/conclusion' | '/tags'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/tags' | '/'
+  to: '/auth' | '/conclusion' | '/tags' | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/conclusion'
     | '/_authenticated/tags'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
@@ -99,15 +109,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTagsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/conclusion': {
+      id: '/_authenticated/conclusion'
+      path: '/conclusion'
+      fullPath: '/conclusion'
+      preLoaderRoute: typeof AuthenticatedConclusionRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedConclusionRoute: typeof AuthenticatedConclusionRoute
   AuthenticatedTagsRoute: typeof AuthenticatedTagsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedConclusionRoute: AuthenticatedConclusionRoute,
   AuthenticatedTagsRoute: AuthenticatedTagsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
@@ -122,13 +141,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
