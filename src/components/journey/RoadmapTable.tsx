@@ -383,6 +383,7 @@ function BucketRow({
   tags,
   linesForCell,
   showMoneyOnFire,
+  activeLineId,
   onUpdateLine,
   onDeleteLine,
   onAddLine,
@@ -395,6 +396,7 @@ function BucketRow({
   tags: Tag[];
   linesForCell: (stageId: string) => Line[];
   showMoneyOnFire: boolean;
+  activeLineId: string | null;
   onUpdateLine: (stageId: string, lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (stageId: string, lineId: string) => void;
   onAddLine: (stageId: string) => void;
@@ -431,6 +433,7 @@ function BucketRow({
           fire={showMoneyOnFire && !!s.onFire}
           lines={linesForCell(s.id)}
           tags={tags}
+          activeLineId={activeLineId}
           onUpdateLine={(lineId, patch) => onUpdateLine(s.id, lineId, patch)}
           onDeleteLine={(lineId) => onDeleteLine(s.id, lineId)}
           onAddLine={() => onAddLine(s.id)}
