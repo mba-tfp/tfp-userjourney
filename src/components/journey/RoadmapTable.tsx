@@ -213,6 +213,9 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                 tags={doc.tags}
                 linesForCell={(stageId) => linesForCell(stageId, b.key)}
                 showMoneyOnFire={showMoneyOnFire}
+                activeLineId={
+                  active?.type === "line" ? active.lineId : null
+                }
                 onUpdateLine={(stageId, lineId, patch) =>
                   j.updateLine(stageId, lineId, patch)
                 }
