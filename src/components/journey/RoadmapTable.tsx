@@ -458,6 +458,7 @@ function Cell({
   fire,
   lines,
   tags,
+  activeLineId,
   onUpdateLine,
   onDeleteLine,
   onAddLine,
@@ -468,6 +469,7 @@ function Cell({
   fire: boolean;
   lines: Line[];
   tags: Tag[];
+  activeLineId: string | null;
   onUpdateLine: (lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (lineId: string) => void;
   onAddLine: () => void;
@@ -477,31 +479,51 @@ function Cell({
     id: `cell:${stageId}:${bucket}`,
   });
   const isGap = bucket === "gap";
+  const sortableIds = useMemo(
+    () => lines.map((l) => `line:${stageId}:${bucket}:${l.id}`),
+    [lines, stageId, bucket],
+  );
+  // Show empty-cell drop hint when something is being dragged AND this cell
+  // is the current drop target AND it has no rows of its own (other than
+  // possibly the active line that was lifted out).
+  const hasOnlyActive =
+    !!activeLineId && lines.length > 0 && lines.every((l) => l.id === activeLineId);
+  const showEmptyHint =
+    isOver && !!activeLineId && (lines.length === 0 || hasOnlyActive);
 
   return (
     <td
       ref={setNodeRef}
       className={cn(
-        "border-b border-r border-border p-2 align-top min-w-[280px] max-w-[320px] transition-colors",
+        "border-b border-r border-border p-2 align-top min-w-[280px] max-w-[320px] transition-colors relative",
         isGap && "bg-destructive/[0.02]",
         fire && "bg-destructive/[0.05]",
-        isOver && "bg-primary/10 ring-2 ring-inset ring-primary/40",
+        isOver && !!activeLineId && "bg-primary/[0.06] ring-1 ring-inset ring-primary/30",
       )}
     >
-      <ul className="space-y-1.5">
-        {lines.map((l) => (
-          <DraggableLine
-            key={l.id}
-            line={l}
-            stageId={stageId}
-            bucket={bucket}
-            tags={tags}
-            onUpdate={(patch) => onUpdateLine(l.id, patch)}
-            onDelete={() => onDeleteLine(l.id)}
-            onManageTags={onManageTags}
-          />
-        ))}
-      </ul>
+      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+        <ul className="space-y-1.5">
+          {lines.map((l) => (
+            <SortableLine
+              key={l.id}
+              line={l}
+              stageId={stageId}
+              bucket={bucket}
+              tags={tags}
+              activeLineId={activeLineId}
+              onUpdate={(patch) => onUpdateLine(l.id, patch)}
+              onDelete={() => onDeleteLine(l.id)}
+              onManageTags={onManageTags}
+            />
+          ))}
+          {showEmptyHint && (
+            <li
+              aria-hidden="true"
+              className="h-8 rounded-md border border-dashed border-primary/50 bg-primary/[0.05]"
+            />
+          )}
+        </ul>
+      </SortableContext>
       <button
         onClick={onAddLine}
         className="mt-1.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition"
@@ -514,11 +536,12 @@ function Cell({
 
 // ---- Line ----
 
-function DraggableLine({
+function SortableLine({
   line,
   stageId,
   bucket,
   tags,
+  activeLineId,
   onUpdate,
   onDelete,
   onManageTags,
@@ -527,16 +550,29 @@ function DraggableLine({
   stageId: string;
   bucket: Bucket;
   tags: Tag[];
+  activeLineId: string | null;
   onUpdate: (patch: Partial<Line>) => void;
   onDelete: () => void;
   onManageTags: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `line:${stageId}:${bucket}:${line.id}`,
+  const sortableId = `line:${stageId}:${bucket}:${line.id}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({
+    id: sortableId,
   });
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 }
-    : { opacity: isDragging ? 0.3 : 1 };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+  const showDropBar = isOver && !!activeLineId && activeLineId !== line.id;
 
   return (
     <li
@@ -549,6 +585,12 @@ function DraggableLine({
           : "bg-destructive/[0.05] border-dashed border-destructive/40 text-foreground/80",
       )}
     >
+      {showDropBar && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-1 left-1 right-1 h-0.5 rounded-full bg-primary"
+        />
+      )}
       <div className="flex items-start gap-1.5">
         <button
           {...attributes}
@@ -597,4 +639,20 @@ function DraggableLine({
       </div>
     </li>
   );
+}
+
+// (legacy DraggableLine removed in favor of SortableLine above)
+function _RemovedDraggableLineStub({
+  line,
+  stageId,
+  bucket,
+}: {
+  line: Line;
+  stageId: string;
+  bucket: Bucket;
+}) {
+  const _unused = useSortable({
+    id: `line:${stageId}:${bucket}:${line.id}`,
+  });
+  return _unused ? null : null;
 }
