@@ -17,7 +17,12 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, GripVertical, Merge, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, GripVertical, Merge, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import {
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -349,66 +354,72 @@ function SortableRow({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            title="Merge into…"
-            disabled={mergeTargets.length === 0}
-            className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label={`Options for ${tag.name}`}
+            className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition"
           >
-            <Merge className="h-3.5 w-3.5" />
+            <MoreHorizontal className="h-4 w-4" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
-          <DropdownMenuLabel className="text-xs">
-            Merge "{tag.name}" into…
-          </DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger disabled={mergeTargets.length === 0}>
+              <Merge className="h-4 w-4 mr-2" /> Merge into…
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+              <DropdownMenuLabel className="text-xs">
+                Merge "{tag.name}" into…
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {mergeTargets.map((t) => (
+                <DropdownMenuItem
+                  key={t.id}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (
+                      confirm(
+                        `Merge "${tag.name}" into "${t.name}"? All references will move to "${t.name}" and "${tag.name}" will be deleted.`,
+                      )
+                    ) {
+                      onMerge(t.id);
+                    }
+                  }}
+                >
+                  <span
+                    className={cn(
+                      "mr-2 h-2.5 w-2.5 rounded-full",
+                      TAG_DOT[t.color as TagColor] ?? TAG_DOT.slate,
+                    )}
+                  />
+                  {t.name}
+                </DropdownMenuItem>
+              ))}
+              {mergeTargets.length === 0 && (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  No other tags to merge into
+                </div>
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuSeparator />
-          {mergeTargets.map((t) => (
-            <DropdownMenuItem
-              key={t.id}
-              onSelect={(e) => {
-                e.preventDefault();
-                if (
-                  confirm(
-                    `Merge "${tag.name}" into "${t.name}"? All references will move to "${t.name}" and "${tag.name}" will be deleted.`,
-                  )
-                ) {
-                  onMerge(t.id);
-                }
-              }}
-            >
-              <span
-                className={cn(
-                  "mr-2 h-2.5 w-2.5 rounded-full",
-                  TAG_DOT[t.color as TagColor] ?? TAG_DOT.slate,
-                )}
-              />
-              {t.name}
-            </DropdownMenuItem>
-          ))}
-          {mergeTargets.length === 0 && (
-            <div className="px-2 py-1.5 text-xs text-muted-foreground">
-              No other tags to merge into
-            </div>
-          )}
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              if (
+                confirm(
+                  usage > 0
+                    ? `Delete "${tag.name}"? It's used ${usage} time${usage === 1 ? "" : "s"} — those references will be cleared.`
+                    : `Delete "${tag.name}"?`,
+                )
+              ) {
+                onDelete();
+              }
+            }}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-2" /> Delete tag
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <button
-        title="Delete tag"
-        onClick={() => {
-          if (
-            confirm(
-              usage > 0
-                ? `Delete "${tag.name}"? It's used ${usage} time${usage === 1 ? "" : "s"} — those references will be cleared.`
-                : `Delete "${tag.name}"?`,
-            )
-          ) {
-            onDelete();
-          }
-        }}
-        className="rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-secondary transition"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
     </li>
   );
 }
