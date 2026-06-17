@@ -232,7 +232,7 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
         {activeLine ? (
           <div
             className={cn(
-              "rounded-md border px-2 py-1.5 text-xs shadow-lg max-w-[300px]",
+              "rounded-md border px-2 py-1.5 text-xs shadow-xl max-w-[300px] rotate-1",
               activeLine.exists
                 ? "bg-background border-border text-foreground/90"
                 : "bg-destructive/10 border-dashed border-destructive/50 text-foreground",
