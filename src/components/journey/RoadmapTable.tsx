@@ -641,18 +641,3 @@ function SortableLine({
   );
 }
 
-// (legacy DraggableLine removed in favor of SortableLine above)
-function _RemovedDraggableLineStub({
-  line,
-  stageId,
-  bucket,
-}: {
-  line: Line;
-  stageId: string;
-  bucket: Bucket;
-}) {
-  const _unused = useSortable({
-    id: `line:${stageId}:${bucket}:${line.id}`,
-  });
-  return _unused ? null : null;
-}
