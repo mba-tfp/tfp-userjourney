@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -6,16 +6,17 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
-  useDraggable,
   useDroppable,
-  pointerWithin,
+  closestCorners,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   arrayMove,
   horizontalListSortingStrategy,
+  verticalListSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
@@ -59,9 +60,10 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
       }
     | null
   >(null);
+  const [overCellId, setOverCellId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -79,12 +81,29 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
     }
   };
 
+  const onDragOver = (e: DragOverEvent) => {
+    const o = e.over ? String(e.over.id) : null;
+    if (!o) {
+      setOverCellId(null);
+      return;
+    }
+    if (o.startsWith("cell:")) setOverCellId(o);
+    else if (o.startsWith("line:")) {
+      const [, stageId, bucket] = o.split(":");
+      setOverCellId(`cell:${stageId}:${bucket}`);
+    } else {
+      setOverCellId(null);
+    }
+  };
+
   const onDragEnd = (e: DragEndEvent) => {
     const a = String(e.active.id);
     const o = e.over ? String(e.over.id) : null;
     setActive(null);
+    setOverCellId(null);
     if (!o || a === o) return;
 
+    // Stage column reorder
     if (a.startsWith("stage:") && o.startsWith("stage:")) {
       const ids = doc.stages.map((s) => s.id);
       const oi = ids.indexOf(a.slice(6));
@@ -92,8 +111,28 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
       if (oi >= 0 && ni >= 0) j.reorderStages(arrayMove(ids, oi, ni));
       return;
     }
-    if (a.startsWith("line:") && o.startsWith("cell:")) {
-      const [, fromStageId, fromBucket, lineId] = a.split(":");
+
+    if (!a.startsWith("line:")) return;
+    const [, fromStageId, fromBucket, lineId] = a.split(":");
+
+    // Line over another line — reorder (same or cross cell)
+    if (o.startsWith("line:")) {
+      const [, toStageId, toBucket, overLineId] = o.split(":");
+      if (overLineId === lineId) return;
+      const dstArr = doc.lines[toStageId] ?? [];
+      const toIndex = dstArr.findIndex((l) => l.id === overLineId);
+      j.moveLineToCell({
+        fromStageId,
+        lineId,
+        toStageId,
+        exists: toBucket === "exists",
+        toIndex: toIndex >= 0 ? toIndex : undefined,
+      });
+      return;
+    }
+
+    // Line over an empty cell — append
+    if (o.startsWith("cell:")) {
       const [, toStageId, toBucket] = o.split(":");
       if (fromStageId === toStageId && fromBucket === toBucket) return;
       j.moveLineToCell({
@@ -115,10 +154,14 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={closestCorners}
       onDragStart={onDragStart}
+      onDragOver={onDragOver}
       onDragEnd={onDragEnd}
-      onDragCancel={() => setActive(null)}
+      onDragCancel={() => {
+        setActive(null);
+        setOverCellId(null);
+      }}
     >
       <div className="overflow-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="border-collapse min-w-full">
@@ -170,6 +213,9 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                 tags={doc.tags}
                 linesForCell={(stageId) => linesForCell(stageId, b.key)}
                 showMoneyOnFire={showMoneyOnFire}
+                activeLineId={
+                  active?.type === "line" ? active.lineId : null
+                }
                 onUpdateLine={(stageId, lineId, patch) =>
                   j.updateLine(stageId, lineId, patch)
                 }
@@ -186,7 +232,7 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
         {activeLine ? (
           <div
             className={cn(
-              "rounded-md border px-2 py-1.5 text-xs shadow-lg max-w-[300px]",
+              "rounded-md border px-2 py-1.5 text-xs shadow-xl max-w-[300px] rotate-1",
               activeLine.exists
                 ? "bg-background border-border text-foreground/90"
                 : "bg-destructive/10 border-dashed border-destructive/50 text-foreground",
@@ -337,6 +383,7 @@ function BucketRow({
   tags,
   linesForCell,
   showMoneyOnFire,
+  activeLineId,
   onUpdateLine,
   onDeleteLine,
   onAddLine,
@@ -349,6 +396,7 @@ function BucketRow({
   tags: Tag[];
   linesForCell: (stageId: string) => Line[];
   showMoneyOnFire: boolean;
+  activeLineId: string | null;
   onUpdateLine: (stageId: string, lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (stageId: string, lineId: string) => void;
   onAddLine: (stageId: string) => void;
@@ -385,6 +433,7 @@ function BucketRow({
           fire={showMoneyOnFire && !!s.onFire}
           lines={linesForCell(s.id)}
           tags={tags}
+          activeLineId={activeLineId}
           onUpdateLine={(lineId, patch) => onUpdateLine(s.id, lineId, patch)}
           onDeleteLine={(lineId) => onDeleteLine(s.id, lineId)}
           onAddLine={() => onAddLine(s.id)}
@@ -409,6 +458,7 @@ function Cell({
   fire,
   lines,
   tags,
+  activeLineId,
   onUpdateLine,
   onDeleteLine,
   onAddLine,
@@ -419,6 +469,7 @@ function Cell({
   fire: boolean;
   lines: Line[];
   tags: Tag[];
+  activeLineId: string | null;
   onUpdateLine: (lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (lineId: string) => void;
   onAddLine: () => void;
@@ -428,31 +479,51 @@ function Cell({
     id: `cell:${stageId}:${bucket}`,
   });
   const isGap = bucket === "gap";
+  const sortableIds = useMemo(
+    () => lines.map((l) => `line:${stageId}:${bucket}:${l.id}`),
+    [lines, stageId, bucket],
+  );
+  // Show empty-cell drop hint when something is being dragged AND this cell
+  // is the current drop target AND it has no rows of its own (other than
+  // possibly the active line that was lifted out).
+  const hasOnlyActive =
+    !!activeLineId && lines.length > 0 && lines.every((l) => l.id === activeLineId);
+  const showEmptyHint =
+    isOver && !!activeLineId && (lines.length === 0 || hasOnlyActive);
 
   return (
     <td
       ref={setNodeRef}
       className={cn(
-        "border-b border-r border-border p-2 align-top min-w-[280px] max-w-[320px] transition-colors",
+        "border-b border-r border-border p-2 align-top min-w-[280px] max-w-[320px] transition-colors relative",
         isGap && "bg-destructive/[0.02]",
         fire && "bg-destructive/[0.05]",
-        isOver && "bg-primary/10 ring-2 ring-inset ring-primary/40",
+        isOver && !!activeLineId && "bg-primary/[0.06] ring-1 ring-inset ring-primary/30",
       )}
     >
-      <ul className="space-y-1.5">
-        {lines.map((l) => (
-          <DraggableLine
-            key={l.id}
-            line={l}
-            stageId={stageId}
-            bucket={bucket}
-            tags={tags}
-            onUpdate={(patch) => onUpdateLine(l.id, patch)}
-            onDelete={() => onDeleteLine(l.id)}
-            onManageTags={onManageTags}
-          />
-        ))}
-      </ul>
+      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+        <ul className="space-y-1.5">
+          {lines.map((l) => (
+            <SortableLine
+              key={l.id}
+              line={l}
+              stageId={stageId}
+              bucket={bucket}
+              tags={tags}
+              activeLineId={activeLineId}
+              onUpdate={(patch) => onUpdateLine(l.id, patch)}
+              onDelete={() => onDeleteLine(l.id)}
+              onManageTags={onManageTags}
+            />
+          ))}
+          {showEmptyHint && (
+            <li
+              aria-hidden="true"
+              className="h-8 rounded-md border border-dashed border-primary/50 bg-primary/[0.05]"
+            />
+          )}
+        </ul>
+      </SortableContext>
       <button
         onClick={onAddLine}
         className="mt-1.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition"
@@ -465,11 +536,12 @@ function Cell({
 
 // ---- Line ----
 
-function DraggableLine({
+function SortableLine({
   line,
   stageId,
   bucket,
   tags,
+  activeLineId,
   onUpdate,
   onDelete,
   onManageTags,
@@ -478,16 +550,29 @@ function DraggableLine({
   stageId: string;
   bucket: Bucket;
   tags: Tag[];
+  activeLineId: string | null;
   onUpdate: (patch: Partial<Line>) => void;
   onDelete: () => void;
   onManageTags: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `line:${stageId}:${bucket}:${line.id}`,
+  const sortableId = `line:${stageId}:${bucket}:${line.id}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({
+    id: sortableId,
   });
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 }
-    : { opacity: isDragging ? 0.3 : 1 };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+  const showDropBar = isOver && !!activeLineId && activeLineId !== line.id;
 
   return (
     <li
@@ -500,6 +585,12 @@ function DraggableLine({
           : "bg-destructive/[0.05] border-dashed border-destructive/40 text-foreground/80",
       )}
     >
+      {showDropBar && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-1 left-1 right-1 h-0.5 rounded-full bg-primary"
+        />
+      )}
       <div className="flex items-start gap-1.5">
         <button
           {...attributes}
@@ -549,3 +640,4 @@ function DraggableLine({
     </li>
   );
 }
+
