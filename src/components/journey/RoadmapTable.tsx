@@ -20,7 +20,14 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Flame, GripVertical, Plus, Trash2, X } from "lucide-react";
+import { Flame, GripVertical, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EditableText } from "./EditableText";
 import { TagPicker } from "./TagPicker";
 import { useJourney } from "@/lib/journey-store";
@@ -297,13 +304,24 @@ function StageHeader({
             </button>
           </div>
         </div>
-        <button
-          onClick={onDelete}
-          title="Delete stage"
-          className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label={`Options for stage ${stage.title}`}
+              className="opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" /> Delete stage
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </th>
   );
