@@ -526,14 +526,25 @@ function DraggableLine({
           </div>
         </div>
       </div>
-      <div className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 group-hover/line:opacity-100 transition">
-        <button
-          title="Delete line"
-          onClick={onDelete}
-          className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-destructive"
-        >
-          <Trash2 className="h-3 w-3" />
-        </button>
+      <div className="absolute right-1 top-1 opacity-0 group-hover/line:opacity-100 focus-within:opacity-100 transition">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label="Line options"
+              className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground data-[state=open]:opacity-100"
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" /> Delete line
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </li>
   );
