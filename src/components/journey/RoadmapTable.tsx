@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -6,16 +6,17 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
-  useDraggable,
   useDroppable,
-  pointerWithin,
+  closestCorners,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   arrayMove,
   horizontalListSortingStrategy,
+  verticalListSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
@@ -59,9 +60,10 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
       }
     | null
   >(null);
+  const [overCellId, setOverCellId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -79,12 +81,29 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
     }
   };
 
+  const onDragOver = (e: DragOverEvent) => {
+    const o = e.over ? String(e.over.id) : null;
+    if (!o) {
+      setOverCellId(null);
+      return;
+    }
+    if (o.startsWith("cell:")) setOverCellId(o);
+    else if (o.startsWith("line:")) {
+      const [, stageId, bucket] = o.split(":");
+      setOverCellId(`cell:${stageId}:${bucket}`);
+    } else {
+      setOverCellId(null);
+    }
+  };
+
   const onDragEnd = (e: DragEndEvent) => {
     const a = String(e.active.id);
     const o = e.over ? String(e.over.id) : null;
     setActive(null);
+    setOverCellId(null);
     if (!o || a === o) return;
 
+    // Stage column reorder
     if (a.startsWith("stage:") && o.startsWith("stage:")) {
       const ids = doc.stages.map((s) => s.id);
       const oi = ids.indexOf(a.slice(6));
@@ -92,8 +111,28 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
       if (oi >= 0 && ni >= 0) j.reorderStages(arrayMove(ids, oi, ni));
       return;
     }
-    if (a.startsWith("line:") && o.startsWith("cell:")) {
-      const [, fromStageId, fromBucket, lineId] = a.split(":");
+
+    if (!a.startsWith("line:")) return;
+    const [, fromStageId, fromBucket, lineId] = a.split(":");
+
+    // Line over another line — reorder (same or cross cell)
+    if (o.startsWith("line:")) {
+      const [, toStageId, toBucket, overLineId] = o.split(":");
+      if (overLineId === lineId) return;
+      const dstArr = doc.lines[toStageId] ?? [];
+      const toIndex = dstArr.findIndex((l) => l.id === overLineId);
+      j.moveLineToCell({
+        fromStageId,
+        lineId,
+        toStageId,
+        exists: toBucket === "exists",
+        toIndex: toIndex >= 0 ? toIndex : undefined,
+      });
+      return;
+    }
+
+    // Line over an empty cell — append
+    if (o.startsWith("cell:")) {
       const [, toStageId, toBucket] = o.split(":");
       if (fromStageId === toStageId && fromBucket === toBucket) return;
       j.moveLineToCell({
@@ -115,10 +154,14 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={closestCorners}
       onDragStart={onDragStart}
+      onDragOver={onDragOver}
       onDragEnd={onDragEnd}
-      onDragCancel={() => setActive(null)}
+      onDragCancel={() => {
+        setActive(null);
+        setOverCellId(null);
+      }}
     >
       <div className="overflow-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="border-collapse min-w-full">
