@@ -4,6 +4,8 @@ import {
   seedDoc,
   newId,
   VALUE_TAG_IDS,
+  BLOOMIC_LINE_TEXTS,
+  BLOOMIC_TAG_NAME,
   type JourneyDoc,
   type Line,
   type Stage,
@@ -36,6 +38,34 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
       changed = true;
     }
   }
+
+  // Ensure the Bloomic tag exists in the stored tag palette.
+  let bloomic = next.tags.find((t) => t.name === BLOOMIC_TAG_NAME);
+  if (!bloomic) {
+    bloomic = { id: newId("t"), name: BLOOMIC_TAG_NAME, color: "violet" };
+    next.tags = [...next.tags, bloomic];
+    changed = true;
+  }
+  const bloomicId = bloomic.id;
+
+  // Apply Bloomic tag to any gap line whose text matches the Bloomic target set.
+  for (const stage of seedDoc.stages) {
+    const arr = next.lines[stage.id];
+    if (!arr) continue;
+    let stageChanged = false;
+    const updated = arr.map((l) => {
+      if (l.exists) return l;
+      if (!BLOOMIC_LINE_TEXTS.has(l.text.trim())) return l;
+      if (l.tagIds.includes(bloomicId)) return l;
+      stageChanged = true;
+      return { ...l, tagIds: [...l.tagIds, bloomicId] };
+    });
+    if (stageChanged) {
+      next.lines[stage.id] = updated;
+      changed = true;
+    }
+  }
+
   return { doc: next, changed };
 }
 
