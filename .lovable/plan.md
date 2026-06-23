@@ -1,74 +1,54 @@
-## Replace inline editing with a TipTap modal editor
+## What changes
 
-Switch every editable text field in the journey map (stage emoji, stage title, stage subtitle, line text) from inline editing to a centered modal dialog with a minimal TipTap rich text editor.
+Three related changes to the roadmap table.
 
-### Dependencies to add
+### 1. "Money on fire" becomes per-line
 
-- `@tiptap/react`
-- `@tiptap/starter-kit` (provides bold, italic, bullet list, ordered list, history)
-- `@tiptap/extension-underline` (underline is not in StarterKit)
-- `@tailwindcss/typography` (provides `prose` classes for rendering HTML)
+Today `stage.onFire` tints an entire column. Move the flag onto each `Line`.
 
-Wire `@tailwindcss/typography` into `src/styles.css` via `@plugin "@tailwindcss/typography";` (Tailwind v4 plugin syntax).
+- Add `onFire?: boolean` to the `Line` type in `src/lib/journey-data.ts`.
+- In `RoadmapTable.tsx`:
+  - Remove the Fire toggle button and red column tint from `StageHeader`.
+  - In `SortableLine`, add a small flame icon button (next to the existing line-options dot menu) that toggles `line.onFire`. Active state uses the same destructive-red treatment.
+  - When the global "Money on fire" header toggle is ON: dim every line whose `onFire` is not true (`opacity-40`) and keep on-fire lines at full opacity with a subtle red ring/background. When OFF: render normally, with a small flame badge visible on on-fire lines so users can still see which are flagged.
+- In `src/routes/_authenticated/index.tsx`, change `stats.fires` to count lines with `onFire === true` across all stages instead of stages.
+- Store: add `toggleLineOnFire(stageId, lineId)`; remove the now-unused `toggleStageOnFire` call site (keep the store method for back-compat or delete it — delete it since it has only one caller).
+- Migration in `journey-store.ts` `normalize()`: for any stored doc where `stage.onFire === true`, set `line.onFire = true` on every gap line in that stage (lines with `exists === false`). This preserves the prior "money on fire" intent by promoting the column flag down to its red gap lines. After migration, drop `stage.onFire` from output.
+- Seed data: replace the `ON_FIRE_INDEXES` stage-level seeding with line-level seeding. The five `FIRE_GAP_LINES` already produced by the prior migration get `onFire: true` automatically when prepended; mark the same seed-side prepend with `onFire: true` so a fresh user gets them flagged. Other gap lines in the same five stages stay un-flagged unless the user toggles them.
 
-### New component: `EditableTextModal`
+### 2. Value tags (Capacity / Revenue / Cost) move from stage to line
 
-File: `src/components/journey/EditableTextModal.tsx`.
+Today `stage.valueTagIds` shows Capacity/Revenue/Cost pills in the column header and powers the per-value stats in the page header. Move them onto lines so each line can carry its own value tag(s).
 
-Props (same call sites as today's `EditableText` so swap-in is mechanical):
+- In `StageHeader`, remove the Value `TagPicker`.
+- In `SortableLine`, render a second `TagPicker` immediately below the existing tag picker, bound to `doc.valueTags` and `line.valueTagIds`, labelled "Value". Keep the regular tag picker (Patient/Clinic/TFP/Channel/Bloomic) untouched. Two separate pickers keep the distinction clear and avoid merging two semantically different palettes.
+- Add `valueTagIds: string[]` to the `Line` type, default `[]`.
+- Store: add `updateLine` already handles arbitrary patches; add explicit normalization for `valueTagIds` (`Array.from(new Set(...))`) the same way it does for `tagIds`. `addLine` and `addLineInCell` initialize `valueTagIds: []`.
+- Stats in `_authenticated/index.tsx`: change `byValue` to sum across `doc.lines[*].valueTagIds` instead of `stage.valueTagIds`. Stat pills in the header keep working unchanged.
+- Migration in `normalize()`: for each stored stage with non-empty `valueTagIds`, copy those ids onto every line in that stage (union with any existing `line.valueTagIds`). Then clear `stage.valueTagIds` to `[]`. This preserves the meaning the user already encoded at the column level by pushing it down to each line that lived in that column. The user can then prune per line.
+- `Stage.valueTagIds` field stays on the type for one release for back-compat reading; UI no longer writes to it. Drop it later.
 
-- `value: string` — stored HTML (or plain text from legacy data)
-- `onChange: (v: string) => void`
-- `className?: string` — applied to the trigger
-- `multiline?: boolean` — kept for API compat; modal supports rich content regardless
-- `placeholder?: string`
-- `label?: string` — modal title ("Edit line", "Edit stage title", etc.). Defaults to "Edit text".
-- `plainText?: boolean` — NEW. When true, the trigger renders text content only (no HTML) and Save stores plain text via `editor.getText()`. Used for stage emoji and any field that must not render markup.
+### 3. Fix undo / redo
 
-Behavior:
+Root cause: `past` and `future` are refs, and `canUndo`/`canRedo` are read off `past.current.length` at hook return. `bumpHistory()` is called from inside another `setState` updater, which under StrictMode and concurrent rendering does not reliably re-render in time for the toolbar buttons to flip from disabled to enabled. The buttons therefore appear stuck.
 
-- Trigger: a `<div>` (or `<span>` for inline fields) with `role="button"`, `tabIndex={0}`, click + Enter/Space open the modal. Renders existing value:
-  - `plainText` mode: render `value` as text (current emoji behavior preserved).
-  - Default mode: render with `dangerouslySetInnerHTML` wrapped in `prose prose-sm max-w-none prose-p:my-0 prose-ul:my-1 prose-ol:my-1` so bullets/bold/italic display correctly inside compact cells.
-  - Empty value falls back to muted placeholder text.
-- Modal: shadcn `Dialog` (already installed). `DialogContent` provides centered layout, subtle backdrop overlay, Escape to close, click-outside to close — matches the requirements out of the box.
-- Inside the modal:
-  - `DialogHeader` with `DialogTitle` showing the `label` prop.
-  - Toolbar: icon buttons for Bold, Italic, Underline, Bullet list, Numbered list, Clear formatting (lucide icons: `Bold`, `Italic`, `Underline`, `List`, `ListOrdered`, `RemoveFormatting`). Buttons toggle `editor.chain().focus().toggleBold().run()` etc. Active state styled via `editor.isActive('bold')`.
-  - TipTap `EditorContent` styled with `prose prose-sm max-w-none min-h-[180px]` inside a bordered container.
-  - Footer with Cancel (closes, discards) and Save (calls `onChange(editor.getHTML())` or `editor.getText()` when `plainText`, then closes).
-- TipTap setup:
-  - `useEditor({ extensions: [StarterKit, Underline], content: value, autofocus: 'end' })`.
-  - When the dialog opens, call `editor.commands.setContent(value, false)` and `editor.commands.focus('end')` so prior formatting renders and focus lands in the editor.
-  - Destroy editor when dialog closes (or rely on component unmount with `key` on `EditorContent` per-open).
-- Keyboard: focus enters editor on open. Tab order follows DOM: editor → toolbar buttons after editor are skipped (toolbar lives above editor, so it's reachable by Shift+Tab); place toolbar buttons before the editor in the DOM so Tab cycles toolbar → editor → Cancel → Save. shadcn Dialog handles focus trap and Escape automatically.
+Fix:
 
-### Apply to call sites
+- Track history lengths as real state: `const [pastLen, setPastLen] = useState(0)` and `const [futureLen, setFutureLen] = useState(0)`.
+- After every push/pop, call `setPastLen(past.current.length)` and `setFutureLen(future.current.length)` from outside the `setDoc` updater. Concretely, refactor `update`, `undo`, `redo`, `reset`, `importDoc` to compute the mutation first, then call both `setDoc(next)` and the length setters at the top level (no nested setState).
+- Return `canUndo: pastLen > 0` and `canRedo: futureLen > 0`.
+- Remove `historyTick` and `_historyTick`.
 
-`src/components/journey/RoadmapTable.tsx`:
+This also fixes the keyboard shortcut path (Cmd/Ctrl+Z) which currently relies on the same broken signal to update the toolbar.
 
-- Stage emoji (`stage.emoji`): `EditableTextModal` with `plainText` and `label="Edit stage emoji"`.
-- Stage title (`stage.title`): `EditableTextModal` with `plainText` and `label="Edit stage title"`.
+## Files touched
 
-  Reason: per the user's own warning, the stage title is also used as the drag-handle title attribute and the `aria-label` for the stage options menu (`aria-label={\`Options for stage ${stage.title}\`}`). Stripping markup at render time is brittle; storing the title as plain text avoids the problem entirely while still opening the same modal UI on click. Bold/italic/lists are unnecessary for a stage title.
+- `src/lib/journey-data.ts` — `Line.onFire`, `Line.valueTagIds`, seed lines flag the prepended fire gap lines.
+- `src/lib/journey-store.ts` — migration (stage.onFire → line.onFire on gap lines; stage.valueTagIds → line.valueTagIds), `toggleLineOnFire`, history state, remove `toggleStageOnFire`.
+- `src/components/journey/RoadmapTable.tsx` — remove fire toggle and value picker from `StageHeader`; add flame toggle, value picker, and on-fire visual treatment to `SortableLine`; drop column-level fire tint.
+- `src/routes/_authenticated/index.tsx` — stats compute from lines.
 
-- Stage subtitle (`stage.subtitle`): rich HTML mode, `label="Edit stage subtitle"`.
-- Line text (`line.text`): rich HTML mode, `label="Edit line"`.
+## Out of scope
 
-`src/components/journey/LineRow.tsx`: same swap for `line.text`.
-
-### Delete old component
-
-Remove `src/components/journey/EditableText.tsx`. Update both import sites to `EditableTextModal`.
-
-### Out of scope
-
-- No store, Supabase, drag-and-drop, or tag changes.
-- No migration of existing plain-text values — TipTap accepts plain strings as content and wraps them in `<p>` on first save; existing data continues to render via `prose`.
-- Doc title in the page header (`{doc.title}` in `src/routes/_authenticated/index.tsx`) is not currently editable and is unchanged.
-
-### Files touched
-
-- Add: `src/components/journey/EditableTextModal.tsx`
-- Delete: `src/components/journey/EditableText.tsx`
-- Edit: `src/components/journey/RoadmapTable.tsx`, `src/components/journey/LineRow.tsx`, `src/styles.css`, `package.json` (via `bun add`)
+- Tag manager UI, TipTap modal, drag-and-drop, save/load wiring — unchanged.
+- `LineRow.tsx` (the older row component used in another spot) — unchanged; this work is in `RoadmapTable.tsx`.
