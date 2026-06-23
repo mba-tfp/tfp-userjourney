@@ -254,23 +254,13 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
 function StageHeader({
   stage,
   index,
-  valueTags,
-  showMoneyOnFire,
   onRename,
-  onValueChange,
-  onToggleOnFire,
   onDelete,
-  onManageValueTags,
 }: {
   stage: import("@/lib/journey-data").Stage;
   index: number;
-  valueTags: Tag[];
-  showMoneyOnFire: boolean;
   onRename: (patch: Partial<import("@/lib/journey-data").Stage>) => void;
-  onValueChange: (next: string[]) => void;
-  onToggleOnFire: () => void;
   onDelete: () => void;
-  onManageValueTags: () => void;
 }) {
   const id = `stage:${stage.id}`;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -280,14 +270,12 @@ function StageHeader({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-  const fire = showMoneyOnFire && !!stage.onFire;
   return (
     <th
       ref={setNodeRef}
       style={style}
       className={cn(
         "group sticky top-0 z-10 bg-card border-b border-r border-border p-3 text-left align-top min-w-[280px] max-w-[320px]",
-        fire && "bg-destructive/5",
         isDragging && "shadow-lg",
       )}
     >
@@ -330,28 +318,6 @@ function StageHeader({
                 />
               </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-            <TagPicker
-              tags={valueTags}
-              values={stage.valueTagIds}
-              onChange={onValueChange}
-              onManage={onManageValueTags}
-              placeholder="Value"
-              manageLabel="Manage value tags…"
-            />
-            <button
-              onClick={onToggleOnFire}
-              title={stage.onFire ? "Unmark money on fire" : "Mark money on fire"}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition",
-                stage.onFire
-                  ? "bg-destructive text-destructive-foreground border-destructive"
-                  : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary",
-              )}
-            >
-              <Flame className="h-3 w-3" /> Fire
-            </button>
           </div>
         </div>
         <DropdownMenu>
