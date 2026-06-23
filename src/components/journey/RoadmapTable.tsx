@@ -29,7 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EditableText } from "./EditableText";
+import { EditableTextModal } from "./EditableTextModal";
 import { TagPicker } from "./TagPicker";
 import { useJourney } from "@/lib/journey-store";
 import { type Line, type Tag } from "@/lib/journey-data";
@@ -306,23 +306,28 @@ function StageHeader({
             Stage {String(index + 1).padStart(2, "0")}
           </div>
           <div className="mt-1 flex items-start gap-2">
-            <EditableText
+            <EditableTextModal
               value={stage.emoji}
               onChange={(emoji) => onRename({ emoji })}
               className="text-xl leading-none w-7 text-center"
+              plainText
+              label="Edit stage emoji"
             />
             <div className="min-w-0 flex-1">
-              <EditableText
+              <EditableTextModal
                 value={stage.title}
                 onChange={(title) => onRename({ title })}
                 className="font-semibold text-sm leading-tight"
+                plainText
+                label="Edit stage title"
               />
               <div className="text-xs text-muted-foreground leading-snug mt-0.5">
-                <EditableText
+                <EditableTextModal
                   multiline
                   value={stage.subtitle}
                   onChange={(subtitle) => onRename({ subtitle })}
                   placeholder="Add subtitle…"
+                  label="Edit stage subtitle"
                 />
               </div>
             </div>
@@ -601,11 +606,12 @@ function SortableLine({
           <GripVertical className="h-3 w-3" />
         </button>
         <div className="flex-1 min-w-0">
-          <EditableText
+          <EditableTextModal
             multiline
             value={line.text}
             onChange={(text) => onUpdate({ text })}
             placeholder="Add a note…"
+            label="Edit line"
           />
           <div className="mt-1">
             <TagPicker
