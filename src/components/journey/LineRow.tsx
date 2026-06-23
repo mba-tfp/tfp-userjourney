@@ -5,7 +5,7 @@ import {
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
-import { EditableText } from "./EditableText";
+import { EditableTextModal } from "./EditableTextModal";
 import { TagPicker } from "./TagPicker";
 import {
   DropdownMenu,
@@ -55,12 +55,13 @@ export function LineRow({
           onManage={onManageTags}
         />
       </div>
-      <EditableText
+      <EditableTextModal
         multiline
         value={line.text}
         onChange={(text) => onChange({ text })}
         placeholder="Add a note…"
         className="flex-1 min-w-0 text-[13.5px] leading-relaxed"
+        label="Edit line"
       />
       <div className="flex-shrink-0 self-start pt-0.5">
         <DropdownMenu>
