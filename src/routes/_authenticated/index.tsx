@@ -8,7 +8,7 @@ import { RoadmapTable } from "@/components/journey/RoadmapTable";
 import type { TagColor } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_authenticated/conclusion")({
+export const Route = createFileRoute("/_authenticated/")({
   component: ConclusionPage,
 });
 
