@@ -407,6 +407,65 @@ if (bloomicTagId) {
   }
 }
 
+// Additional lens-row commentary lines appended to existing stages. These are
+// "exists: true" lens entries (Patient/Clinic/TFP/Channel) — not gaps —
+// appended after the seed content. Exported so the store migration can apply
+// the same set to already-stored docs (idempotent by exact text match).
+export const ADDITIONAL_LENS_LINES: ReadonlyArray<{
+  stageIndex: number;
+  tagName: "Patient" | "Clinic" | "TFP" | "Channel";
+  text: string;
+}> = [
+  // Stage 1 — Awareness & Discovery
+  { stageIndex: 0, tagName: "TFP", text: "52% of market in awareness only. Website is a brochure, not a lead-generation tool. Competitors capturing early patients." },
+  { stageIndex: 0, tagName: "TFP", text: "Marketing spend blind to channel performance, quality, and cost per lead." },
+  // Stage 2 — Consideration & Comparison
+  { stageIndex: 1, tagName: "TFP", text: "No lead attribution. Marketing blind to which channels drive quality patient inquiries." },
+  // Stage 3 — Referral & Conversion
+  { stageIndex: 2, tagName: "TFP", text: "30 to 41 day intake delays. 3,084 patients unregistered and stalled in the funnel." },
+  { stageIndex: 2, tagName: "Channel", text: "No feedback loop to HCP. Referring physician never learns when patient was seen or what the outcome was. Drives referrals to competitors." },
+  // Stage 4 — Intake & Onboarding
+  { stageIndex: 3, tagName: "TFP", text: "Form completion rate varies 53 to 84% across clinics. No enterprise visibility into why." },
+  { stageIndex: 3, tagName: "Clinic", text: "No REI visit type tracking. Consult mix is invisible to management." },
+  { stageIndex: 3, tagName: "Clinic", text: "REI leave not coordinated across locations. Cancellations occur when no cover arranged." },
+  { stageIndex: 3, tagName: "Clinic", text: "Each location runs its own intake model. No cross-site standard or training." },
+  // Stage 5 — Pre-Diagnostic Testing
+  { stageIndex: 4, tagName: "Clinic", text: "Admin manually bridges referral gaps by calling the patient, Rocket Doctor, and the referring HCP. Contractors cannot be directed." },
+  { stageIndex: 4, tagName: "Channel", text: "Rocket Doctor uses rigid same-day booking. Tia Health lets the patient select the time but TFP has no direct relationship with the platform." },
+  // Stage 6 — Notify & Schedule
+  { stageIndex: 5, tagName: "TFP", text: "Funded wait times driving patient defection to Create Fertility." },
+  { stageIndex: 5, tagName: "Clinic", text: "Consult scheduling fully manual. Wait times: 5 weeks to 3 months at RCC, 18 to 22 months for funded IVF at OFC." },
+  { stageIndex: 5, tagName: "TFP", text: "No waitlist forecast. Capacity planning done manually or not at all." },
+  // Stage 7 — Physician Consult
+  { stageIndex: 6, tagName: "TFP", text: "Approximately 10 minutes wasted per consult on manual note handling. Heartland currently uses Scribery instead of Otto-Notes." },
+  { stageIndex: 6, tagName: "Clinic", text: "FertiWise inconsistently shown to patients. Success probability discussion happens at physician discretion only." },
+  // Stage 8 — Care Planning & Readiness
+  { stageIndex: 7, tagName: "TFP", text: "Education investment returns near zero when materials go unused. No visibility into whether patients engage with EngagedMD content." },
+  { stageIndex: 7, tagName: "Patient", text: "No visibility on cycle waitlist position or funding type. Patient does not know if they are on a private, OFP, or provincial coverage queue." },
+  // Stage 9 — The Wait
+  { stageIndex: 8, tagName: "TFP", text: "Nursing capacity consumed by repetitive status calls. No proactive communication infrastructure to reduce inbound volume." },
+  { stageIndex: 8, tagName: "Clinic", text: "No waitlist segmented by funding type: private, OFP, and provincial coverage patients all in the same queue with no differentiation." },
+  // Stage 10 — Outcome & Transition
+  { stageIndex: 9, tagName: "TFP", text: "30% churn after failed outcome is preventable with structured support. Otto Pulse not capturing feedback at this critical moment." },
+  // Stage 11 — Continuity of Care
+  { stageIndex: 10, tagName: "TFP", text: "30% permanent churn. Repeat cycle value $5K to $15K multiplied by 2 to 3 cycles per patient represents major unrecovered LTV." },
+  { stageIndex: 10, tagName: "TFP", text: "Re-entry rate currently 40% against a 60% target. Closing that gap is the highest-ROI growth lever that requires no new patient acquisition." },
+  { stageIndex: 10, tagName: "Clinic", text: "No tracking of return versus churn. No way to measure re-entry rate or identify patients who have quietly left the network." },
+];
+
+for (const al of ADDITIONAL_LENS_LINES) {
+  const stage = stages[al.stageIndex];
+  if (!stage) continue;
+  const tagId = TAG_BY_NAME[al.tagName];
+  let counter = (lines[stage.id]?.length ?? 0) + 1;
+  lines[stage.id].push({
+    id: uid(`${stage.id}-add`, counter++),
+    text: al.text,
+    tagIds: tagId ? [tagId] : [],
+    exists: true,
+  });
+}
+
 export const seedDoc: JourneyDoc = {
   title: "otto Journey Map",
   stages,
