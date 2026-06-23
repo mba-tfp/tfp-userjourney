@@ -230,6 +230,95 @@ stages.forEach((stage, si) => {
   lines[stage.id] = stageLines;
 });
 
+// Additional "doesn't exist today" gap lines per stage. Appended after the
+// source rows so existing data is untouched.
+type ExtraGap = { text: string; tagName: "Patient" | "Clinic" | "TFP" | "Channel" };
+const EXTRA_GAPS: ExtraGap[][] = [
+  // Stage 1 — Awareness & Discovery
+  [
+    { text: "HCP resource hub: TFP-branded page referring physicians can share with patients before the referral is sent.", tagName: "Channel" },
+    { text: "Pre-referral patient education pathway: condition-specific content (PCOS, MFI, unexplained) delivered before the patient contacts TFP.", tagName: "Patient" },
+    { text: "Fertility preservation decision tool for oncology patients, egg freezing candidates, and social freezing inquiries.", tagName: "Patient" },
+  ],
+  // Stage 2 — Consideration & Comparison
+  [
+    { text: "Success rate calculator by patient profile: age, diagnosis, prior treatment.", tagName: "Patient" },
+    { text: "Cost and coverage estimator: what is covered and what is out of pocket by province.", tagName: "Patient" },
+    { text: "Competitor comparison tool (internal) for clinic staff to answer 'why TFP'.", tagName: "TFP" },
+  ],
+  // Stage 3 — Referral & Conversion
+  [
+    { text: "HCP referral portal: structured digital referral submission replacing fax, with status tracking for the referring physician.", tagName: "Channel" },
+    { text: "Self-referral smart intake: triage questions that route the patient before they speak to a coordinator.", tagName: "Patient" },
+    { text: "Cross-clinic patient lookup: check if this patient is already in the TFP network at another clinic.", tagName: "Clinic" },
+  ],
+  // Stage 4 — Intake & Onboarding
+  [
+    { text: "Smart form routing: show only questions relevant to the patient profile — no full 40-question form for a semen analysis patient.", tagName: "Patient" },
+    { text: "REI consult waitlist with patient-facing position visibility.", tagName: "Patient" },
+    { text: "Dedicated partner onboarding flow, separate from the primary patient.", tagName: "Patient" },
+  ],
+  // Stage 5 — Pre-Diagnostic Testing
+  [
+    { text: "Lab result delivery to the patient portal before the consult.", tagName: "Patient" },
+    { text: "Automated requisition dispatch: requisition generated in EMR and pushed to patient portal without manual nurse upload.", tagName: "Clinic" },
+    { text: "Result interpretation plain-language summary explaining what the result means.", tagName: "Patient" },
+  ],
+  // Stage 6 — Notify & Schedule
+  [
+    { text: "Online self-serve booking for first consult.", tagName: "Patient" },
+    { text: "Automated GP notification when a consult is booked.", tagName: "Channel" },
+    { text: "Pre-consult preparation checklist sent to patient automatically after booking.", tagName: "Patient" },
+  ],
+  // Stage 7 — Physician Consult
+  [
+    { text: "Pre-consult AI summary surfaced to physician before they enter the room: health history, prior labs, patient-stated concerns.", tagName: "Clinic" },
+    { text: "Post-consult automated summary sent to the patient after the appointment.", tagName: "Patient" },
+    { text: "FertiWise integrated into the consult flow so every patient gets a success probability discussion.", tagName: "TFP" },
+  ],
+  // Stage 8 — Care Planning & Readiness
+  [
+    { text: "Digital cycle calendar: patient sees their protocol day by day.", tagName: "Patient" },
+    { text: "Funded waitlist visibility: patient sees their position on OFP or provincial funding queue.", tagName: "Patient" },
+    { text: "Medication delivery integration with specialty pharmacy.", tagName: "Channel" },
+    { text: "Financial planning tool: total cycle cost, payment plan options, and grant eligibility.", tagName: "Patient" },
+  ],
+  // Stage 9 — The Wait
+  [
+    { text: "Proactive fertilization and embryo development updates pushed to the patient portal, eliminating daily status calls to the clinic.", tagName: "Patient" },
+    { text: "Emotional support pathway: automated check-in, mental health resource links, and peer support community.", tagName: "Patient" },
+    { text: "Funded vs private cycle waitlist segmentation so patients know exactly where they stand.", tagName: "Clinic" },
+  ],
+  // Stage 10 — Outcome & Transition
+  [
+    { text: "Structured post-outcome pathway: whether positive or negative, a defined next step is automatically triggered.", tagName: "Patient" },
+    { text: "Mental health referral automation triggered after a failed cycle.", tagName: "Patient" },
+    { text: "OB handoff letter generated in Otto-Notes and sent automatically on positive outcome.", tagName: "Channel" },
+    { text: "OttoPulse post-outcome NPS capturing the most critical patient feedback moment.", tagName: "TFP" },
+  ],
+  // Stage 11 — Continuity of Care
+  [
+    { text: "Cryo storage renewal reminders: automated annual notification before embryos are discarded.", tagName: "Patient" },
+    { text: "Re-entry pathway: returning patient skips redundant intake steps and picks up where they left off.", tagName: "Patient" },
+    { text: "Long-term HCP engagement: high-referral physicians identified and nurtured with outcome data.", tagName: "Channel" },
+    { text: "Sibling cycle fast-track: streamlined re-entry for patients returning for a second child.", tagName: "Patient" },
+  ],
+];
+
+stages.forEach((stage, si) => {
+  const extras = EXTRA_GAPS[si] ?? [];
+  let counter = (lines[stage.id]?.length ?? 0) + 1;
+  extras.forEach((eg) => {
+    const tagId = TAG_BY_NAME[eg.tagName];
+    lines[stage.id].push({
+      id: uid(`${stage.id}-gap`, counter++),
+      text: eg.text,
+      tagIds: tagId ? [tagId] : [],
+      exists: false,
+    });
+  });
+});
+
 export const seedDoc: JourneyDoc = {
   title: "otto Journey Map",
   stages,
