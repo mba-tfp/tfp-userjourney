@@ -92,6 +92,7 @@ const tagDefs: { name: string; color: TagColor }[] = [
   { name: "Clinic", color: "amber" },
   { name: "TFP", color: "blue" },
   { name: "Channel", color: "violet" },
+  { name: "Bloomic", color: "violet" },
 ];
 const tags: Tag[] = tagDefs.map((t, i) => ({ id: uid("t", i + 1), ...t }));
 const TAG_BY_NAME: Record<string, string> = Object.fromEntries(
@@ -318,6 +319,50 @@ stages.forEach((stage, si) => {
     });
   });
 });
+
+// Apply the Bloomic tag to any gap line whose text matches one of the
+// Bloomic-owned capabilities (online booking, intake forms, triage, consents,
+// cycle planning, patient portal, surveys/ratings, basic reminders). Exported
+// so the store migration can apply the same set to already-stored docs.
+export const BLOOMIC_LINE_TEXTS: ReadonlySet<string> = new Set([
+  // Existing gap lines from sourceRows
+  "No REI consult waitlist",
+  "No waitlist position or ETA shown digitally.",
+  "No online self-serve booking",
+  "Medeo (selected clinics only)",
+  "No waitlist for private, funded OFP, or regular coverage cycles",
+  "No funded waitlist visibility — unsure of private vs. OFP wait.",
+  "No waitlist segmented by funding type (private / OFP / coverage).",
+  // EXTRA_GAPS lines
+  "Self-referral smart intake: triage questions that route the patient before they speak to a coordinator.",
+  "Smart form routing: show only questions relevant to the patient profile — no full 40-question form for a semen analysis patient.",
+  "REI consult waitlist with patient-facing position visibility.",
+  "Dedicated partner onboarding flow, separate from the primary patient.",
+  "Lab result delivery to the patient portal before the consult.",
+  "Automated requisition dispatch: requisition generated in EMR and pushed to patient portal without manual nurse upload.",
+  "Online self-serve booking for first consult.",
+  "Pre-consult preparation checklist sent to patient automatically after booking.",
+  "Post-consult automated summary sent to the patient after the appointment.",
+  "Digital cycle calendar: patient sees their protocol day by day.",
+  "Funded waitlist visibility: patient sees their position on OFP or provincial funding queue.",
+  "Proactive fertilization and embryo development updates pushed to the patient portal, eliminating daily status calls to the clinic.",
+  "Funded vs private cycle waitlist segmentation so patients know exactly where they stand.",
+  "OttoPulse post-outcome NPS capturing the most critical patient feedback moment.",
+  "Re-entry pathway: returning patient skips redundant intake steps and picks up where they left off.",
+  "Sibling cycle fast-track: streamlined re-entry for patients returning for a second child.",
+]);
+
+export const BLOOMIC_TAG_NAME = "Bloomic";
+const bloomicTagId = TAG_BY_NAME[BLOOMIC_TAG_NAME];
+if (bloomicTagId) {
+  for (const stage of stages) {
+    for (const line of lines[stage.id] ?? []) {
+      if (line.exists) continue;
+      if (!BLOOMIC_LINE_TEXTS.has(line.text.trim())) continue;
+      if (!line.tagIds.includes(bloomicTagId)) line.tagIds.push(bloomicTagId);
+    }
+  }
+}
 
 export const seedDoc: JourneyDoc = {
   title: "otto Journey Map",
