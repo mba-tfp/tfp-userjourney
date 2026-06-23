@@ -679,27 +679,27 @@ export function useJourney() {
       }),
 
     reset: () =>
-      setDoc((d) => {
-        past.current.push(d);
+      (() => {
+        past.current.push(docRef.current);
         if (past.current.length > HISTORY_LIMIT) past.current.shift();
         future.current = [];
-        bumpHistory();
-        return seedDoc;
-      }),
+        commitDoc(seedDoc);
+        setPastLen(past.current.length);
+        setFutureLen(0);
+      })(),
     importDoc: (next: JourneyDoc) =>
-      setDoc((d) => {
-        past.current.push(d);
+      (() => {
+        past.current.push(docRef.current);
         if (past.current.length > HISTORY_LIMIT) past.current.shift();
         future.current = [];
-        bumpHistory();
-        return next;
-      }),
+        commitDoc(next);
+        setPastLen(past.current.length);
+        setFutureLen(0);
+      })(),
 
     undo,
     redo,
-    canUndo: past.current.length > 0,
-    canRedo: future.current.length > 0,
-    // expose tick to satisfy lint usage and force consumers to re-render on history change
-    _historyTick: historyTick,
+    canUndo: pastLen > 0,
+    canRedo: futureLen > 0,
   };
 }
