@@ -33,6 +33,8 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
         text: sl.text,
         tagIds: [...sl.tagIds],
         exists: false,
+        valueTagIds: sl.valueTagIds ? [...sl.valueTagIds] : [],
+        onFire: !!sl.onFire,
       });
     }
     if (toAppend.length) {
@@ -83,6 +85,8 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
           text: fg.text,
           tagIds: [tfpTag.id],
           exists: false,
+          onFire: true,
+          valueTagIds: [],
         },
         ...arr,
       ];
@@ -106,6 +110,7 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
         text: al.text,
         tagIds: tagId ? [tagId] : [],
         exists: true,
+        valueTagIds: [],
       },
     ];
     changed = true;
