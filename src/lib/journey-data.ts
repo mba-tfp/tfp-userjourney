@@ -451,6 +451,48 @@ export const ADDITIONAL_LENS_LINES: ReadonlyArray<{
   { stageIndex: 10, tagName: "TFP", text: "30% permanent churn. Repeat cycle value $5K to $15K multiplied by 2 to 3 cycles per patient represents major unrecovered LTV." },
   { stageIndex: 10, tagName: "TFP", text: "Re-entry rate currently 40% against a 60% target. Closing that gap is the highest-ROI growth lever that requires no new patient acquisition." },
   { stageIndex: 10, tagName: "Clinic", text: "No tracking of return versus churn. No way to measure re-entry rate or identify patients who have quietly left the network." },
+  // Round 2 — additional lens lines
+  // Stage 1
+  { stageIndex: 0, tagName: "Clinic", text: "No inbound referral source tracking. Staff cannot identify which GP or channel is sending the most patients." },
+  { stageIndex: 0, tagName: "Clinic", text: "No staff-facing FAQ or standard script for common inbound questions. Every coordinator answers differently." },
+  // Stage 2
+  { stageIndex: 1, tagName: "Clinic", text: "No standard response protocol for cost, success rate, or insurance questions. Clinic staff improvise every time." },
+  // Stage 3
+  { stageIndex: 2, tagName: "Clinic", text: "Fax triage is entirely manual. One coordinator can spend 2 to 3 hours per day processing incoming referral faxes." },
+  { stageIndex: 2, tagName: "Clinic", text: "Duplicate patient detection does not exist. The same patient can be registered multiple times across clinics with no flag." },
+  { stageIndex: 2, tagName: "TFP", text: "No prioritization logic on referrals. Urgent cases such as oncofertility and advanced maternal age sit in the same queue as standard referrals." },
+  // Stage 4
+  { stageIndex: 3, tagName: "Clinic", text: "No coordinator workload visibility. Supervisors cannot see how many active patients each coordinator is managing." },
+  { stageIndex: 3, tagName: "Clinic", text: "No automated follow-up for incomplete forms. Staff manually chase every patient who did not finish." },
+  { stageIndex: 3, tagName: "TFP", text: "No clinic-to-clinic patient transfer workflow. Moving a patient between TFP locations requires full manual re-entry." },
+  // Stage 5
+  { stageIndex: 4, tagName: "Clinic", text: "Lab results arrive by fax and are manually filed into the EMR. No automated routing or extraction." },
+  { stageIndex: 4, tagName: "Clinic", text: "No standard protocol for pre-consult test ordering. Each physician orders differently with no network standard." },
+  { stageIndex: 4, tagName: "TFP", text: "No tracking of which patients have completed pre-diagnostic workup. Coordinator has to check each chart manually." },
+  // Stage 6
+  { stageIndex: 5, tagName: "Clinic", text: "No automated recall system. Patients who cancel or do not book are not followed up systematically." },
+  { stageIndex: 5, tagName: "Clinic", text: "No network-wide physician availability view. Scheduling staff cannot see a cross-location calendar." },
+  { stageIndex: 5, tagName: "TFP", text: "Physician schedule changes communicated informally by email or Teams. No system-driven notification to affected patients." },
+  // Stage 7
+  { stageIndex: 6, tagName: "Clinic", text: "No post-consult task automation. Coordinator manually determines next steps from the physician's verbal handoff after each consult." },
+  { stageIndex: 6, tagName: "Clinic", text: "Consult letters reviewed and sent manually by transcriptionists with no workflow tracking for letter status or send confirmation." },
+  { stageIndex: 6, tagName: "TFP", text: "No visibility into consult-to-treatment conversion rate per physician. High and low converters are invisible to management." },
+  // Stage 8
+  { stageIndex: 7, tagName: "Clinic", text: "Medication protocol communicated to patients verbally or by email. No digital protocol delivery or patient acknowledgment tracking." },
+  { stageIndex: 7, tagName: "Clinic", text: "Pharmacy coordination handled by individual nurses with no standardized workflow or preferred pharmacy relationship." },
+  { stageIndex: 7, tagName: "TFP", text: "Cycle start dates coordinated manually across nursing, physician, and lab. No shared cycle planning calendar." },
+  // Stage 9
+  { stageIndex: 8, tagName: "Clinic", text: "No standard for how often nurses proactively contact patients during the two-week wait. Each nurse handles it differently." },
+  { stageIndex: 8, tagName: "Clinic", text: "Embryology update calls made individually by embryologists with no logging. No record of what was communicated or when." },
+  { stageIndex: 8, tagName: "TFP", text: "No dashboard showing how many patients are currently in the wait phase across the network. Capacity planning is entirely reactive." },
+  // Stage 10
+  { stageIndex: 9, tagName: "Clinic", text: "Positive outcome handoff to OB is manual. No standard referral letter and no tracking of whether the patient engaged with the OB." },
+  { stageIndex: 9, tagName: "Clinic", text: "Failed outcome follow-up depends entirely on the individual physician or nurse. No standard protocol or timeline exists." },
+  { stageIndex: 9, tagName: "TFP", text: "No measurement of time between outcome communication and next clinical action. Speed of follow-up is invisible to management." },
+  // Stage 11
+  { stageIndex: 10, tagName: "Clinic", text: "Cryo storage consent renewal tracked in spreadsheets or not at all. No automated alert before consent lapses." },
+  { stageIndex: 10, tagName: "Clinic", text: "No standard re-entry workflow for returning patients. They restart intake from scratch as if they are a new referral." },
+  { stageIndex: 10, tagName: "TFP", text: "No identification of high-value returning patients for priority scheduling. Re-entry is treated identically to a new referral." },
 ];
 
 for (const al of ADDITIONAL_LENS_LINES) {
