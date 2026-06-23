@@ -37,11 +37,15 @@ function ConclusionPage() {
     let fires = 0;
     const byValue: Record<string, number> = {};
     for (const s of j.doc.stages) {
-      if (s.onFire) fires++;
-      for (const vt of s.valueTagIds) byValue[vt] = (byValue[vt] ?? 0) + 1;
       const lines = j.doc.lines[s.id] ?? [];
       total += lines.length;
-      for (const l of lines) if (!l.exists) gaps++;
+      for (const l of lines) {
+        if (!l.exists) gaps++;
+        if (l.onFire) fires++;
+        for (const vt of l.valueTagIds ?? []) {
+          byValue[vt] = (byValue[vt] ?? 0) + 1;
+        }
+      }
     }
     return { total, gaps, fires, byValue };
   }, [j.doc, j.hydrated]);

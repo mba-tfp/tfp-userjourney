@@ -33,6 +33,8 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
         text: sl.text,
         tagIds: [...sl.tagIds],
         exists: false,
+        valueTagIds: sl.valueTagIds ? [...sl.valueTagIds] : [],
+        onFire: !!sl.onFire,
       });
     }
     if (toAppend.length) {
@@ -83,6 +85,8 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
           text: fg.text,
           tagIds: [tfpTag.id],
           exists: false,
+          onFire: true,
+          valueTagIds: [],
         },
         ...arr,
       ];
@@ -106,6 +110,7 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
         text: al.text,
         tagIds: tagId ? [tagId] : [],
         exists: true,
+        valueTagIds: [],
       },
     ];
     changed = true;
@@ -130,9 +135,16 @@ function normalize(raw: any): JourneyDoc {
       emoji: s.emoji,
       title: s.title,
       subtitle: s.subtitle,
-      valueTagIds,
+      // Stage-level value tags are migrated onto each line below; keep the
+      // field on the stage for back-compat but clear it so the UI no longer
+      // reads it.
+      valueTagIds: [],
+      // Stage-level onFire is migrated onto gap lines below.
+      _migrateValueTagIds: valueTagIds,
+      _migrateOnFire:
+        typeof s.onFire === "boolean" ? s.onFire : seedDoc.stages[i]?.onFire ?? false,
       onFire: typeof s.onFire === "boolean" ? s.onFire : seedDoc.stages[i]?.onFire ?? false,
-    };
+    } as Stage & { _migrateValueTagIds: string[]; _migrateOnFire: boolean };
   });
   // Identify any legacy "exists today" / "doesn't exist today" tags and migrate
   // their membership onto the line.exists boolean (bucket), then strip the tags.
@@ -159,13 +171,22 @@ function normalize(raw: any): JourneyDoc {
   const isBucketTag = (id: string) => existsTagIds.has(id) || gapTagIds.has(id);
 
   const lines: Record<string, Line[]> = {};
-  const onFireById = new Map(stages.map((s) => [s.id, !!s.onFire]));
+  const stageMigrateById = new Map(
+    (stages as any[]).map((s) => [
+      s.id,
+      {
+        onFire: !!s._migrateOnFire,
+        valueTagIds: (s._migrateValueTagIds as string[]) ?? [],
+      },
+    ]),
+  );
   const clampScore = (n: unknown, fallback: number) => {
     const v = typeof n === "number" && Number.isFinite(n) ? Math.round(n) : fallback;
     return Math.max(1, Math.min(5, v));
   };
   for (const [sid, arr] of Object.entries((raw?.lines ?? {}) as Record<string, any[]>)) {
-    const onFire = onFireById.get(sid) ?? false;
+    const migrate = stageMigrateById.get(sid) ?? { onFire: false, valueTagIds: [] };
+    const stageOnFire = migrate.onFire;
     lines[sid] = (arr ?? []).map((l: any) => {
       const rawIds: string[] = Array.isArray(l.tagIds)
         ? l.tagIds.filter(Boolean)
@@ -176,24 +197,41 @@ function normalize(raw: any): JourneyDoc {
       if (rawIds.some((id) => gapTagIds.has(id))) exists = false;
       else if (rawIds.some((id) => existsTagIds.has(id))) exists = true;
       // Seed scores from signals when missing.
-      const seedUrgency = !exists ? (onFire ? 4 : 3) : 2;
-      const seedImpact = onFire ? 4 : 3;
+      const seedUrgency = !exists ? (stageOnFire ? 4 : 3) : 2;
+      const seedImpact = stageOnFire ? 4 : 3;
+      // Per-line valueTagIds: prefer stored values, otherwise migrate from
+      // the stage. Per-line onFire: prefer stored value, otherwise inherit
+      // the stage flag for gap lines only.
+      const storedLineValueTagIds: string[] = Array.isArray(l.valueTagIds)
+        ? l.valueTagIds.filter(Boolean)
+        : [];
+      const valueTagIds =
+        storedLineValueTagIds.length > 0
+          ? Array.from(new Set(storedLineValueTagIds))
+          : Array.from(new Set(migrate.valueTagIds));
+      const lineOnFire =
+        typeof l.onFire === "boolean" ? l.onFire : !exists && stageOnFire;
       return {
         id: l.id,
         text: l.text ?? "",
         exists,
         tagIds: rawIds.filter((id) => !isBucketTag(id)),
+        valueTagIds,
+        onFire: lineOnFire,
         impact: clampScore(l.impact, seedImpact),
         urgency: clampScore(l.urgency, seedUrgency),
         effort: clampScore(l.effort, 3),
       };
     });
   }
-  // Strip bucket tags from stage valueTagIds defensively, and from doc.tags.
+  // Strip bucket tags from doc.tags.
   const cleanedStages = stages.map((s) => ({
-    ...s,
-    valueTagIds: s.valueTagIds.filter((id) => !isBucketTag(id)),
-  }));
+    id: s.id,
+    emoji: s.emoji,
+    title: s.title,
+    subtitle: s.subtitle,
+    valueTagIds: [] as string[],
+  })) as Stage[];
   const cleanedTags: Tag[] = rawTags
     .filter((t) => !isBucketTag(t.id))
     .map((t) => ({ id: t.id, name: t.name, color: t.color }));
@@ -216,10 +254,15 @@ export function useJourney() {
   // Undo / redo history of doc snapshots.
   const past = useRef<JourneyDoc[]>([]);
   const future = useRef<JourneyDoc[]>([]);
-  const skipHistory = useRef(false);
   const HISTORY_LIMIT = 100;
-  const [historyTick, setHistoryTick] = useState(0);
-  const bumpHistory = () => setHistoryTick((n) => n + 1);
+  const [pastLen, setPastLen] = useState(0);
+  const [futureLen, setFutureLen] = useState(0);
+  const docRef = useRef<JourneyDoc>(seedDoc);
+
+  const commitDoc = useCallback((next: JourneyDoc) => {
+    docRef.current = next;
+    setDoc(next);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -227,26 +270,24 @@ export function useJourney() {
       try {
         const { doc: stored } = await load();
         if (cancelled) return;
-        skipHistory.current = true;
         if (stored) {
           const normalized = normalize(stored);
           const { doc: merged, changed } = mergeSeedGaps(normalized);
-          setDoc(merged);
+          commitDoc(merged);
           if (changed) {
             save({ data: { doc: merged } }).catch((e) =>
               console.error("Failed to persist seed-gap merge", e),
             );
           }
         } else {
-          setDoc(seedDoc);
+          commitDoc(seedDoc);
           // Seed the row so subsequent saves upsert cleanly.
           await save({ data: { doc: seedDoc } });
         }
       } catch (e) {
         console.error("Failed to load journey", e);
         if (!cancelled) {
-          skipHistory.current = true;
-          setDoc(seedDoc);
+          commitDoc(seedDoc);
         }
       } finally {
         if (!cancelled) setHydrated(true);
@@ -255,7 +296,7 @@ export function useJourney() {
     return () => {
       cancelled = true;
     };
-  }, [load, save]);
+  }, [load, save, commitDoc]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -269,39 +310,33 @@ export function useJourney() {
   }, [doc, hydrated, save]);
 
   const update = useCallback((fn: (d: JourneyDoc) => JourneyDoc) => {
-    setDoc((d) => {
-      if (!skipHistory.current) {
-        past.current.push(d);
-        if (past.current.length > HISTORY_LIMIT) past.current.shift();
-        if (future.current.length) future.current = [];
-        bumpHistory();
-      }
-      skipHistory.current = false;
-      return fn(structuredClone(d));
-    });
-  }, []);
+    const prev = docRef.current;
+    past.current.push(prev);
+    if (past.current.length > HISTORY_LIMIT) past.current.shift();
+    future.current = [];
+    const next = fn(structuredClone(prev));
+    commitDoc(next);
+    setPastLen(past.current.length);
+    setFutureLen(0);
+  }, [commitDoc]);
 
   const undo = useCallback(() => {
-    setDoc((d) => {
-      const prev = past.current.pop();
-      if (!prev) return d;
-      future.current.push(d);
-      skipHistory.current = true;
-      bumpHistory();
-      return prev;
-    });
-  }, []);
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(docRef.current);
+    commitDoc(prev);
+    setPastLen(past.current.length);
+    setFutureLen(future.current.length);
+  }, [commitDoc]);
 
   const redo = useCallback(() => {
-    setDoc((d) => {
-      const next = future.current.pop();
-      if (!next) return d;
-      past.current.push(d);
-      skipHistory.current = true;
-      bumpHistory();
-      return next;
-    });
-  }, []);
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(docRef.current);
+    commitDoc(next);
+    setPastLen(past.current.length);
+    setFutureLen(future.current.length);
+  }, [commitDoc]);
 
   // Global keyboard shortcuts: Cmd/Ctrl+Z = undo, Shift+Cmd/Ctrl+Z or Ctrl+Y = redo.
   useEffect(() => {
@@ -402,12 +437,26 @@ export function useJourney() {
         if (s) s.onFire = !s.onFire;
         return d;
       }),
+    toggleLineOnFire: (stageId: string, lineId: string) =>
+      update((d) => {
+        const arr = d.lines[stageId];
+        if (!arr) return d;
+        const i = arr.findIndex((l) => l.id === lineId);
+        if (i >= 0) arr[i] = { ...arr[i], onFire: !arr[i].onFire };
+        return d;
+      }),
 
     // Line CRUD
     addLine: (stageId: string, exists: boolean) =>
       update((d) => {
         d.lines[stageId] = d.lines[stageId] ?? [];
-        d.lines[stageId].push({ id: newId("ln"), text: "", exists, tagIds: [] });
+        d.lines[stageId].push({
+          id: newId("ln"),
+          text: "",
+          exists,
+          tagIds: [],
+          valueTagIds: [],
+        });
         return d;
       }),
     addLineInCell: (stageId: string, tagId: string | null) =>
@@ -418,6 +467,7 @@ export function useJourney() {
           text: "",
           exists: true,
           tagIds: tagId ? [tagId] : [],
+          valueTagIds: [],
         });
         return d;
       }),
@@ -430,6 +480,9 @@ export function useJourney() {
           const next = { ...arr[i], ...patch };
           if (Array.isArray(next.tagIds)) {
             next.tagIds = Array.from(new Set(next.tagIds));
+          }
+          if (Array.isArray(next.valueTagIds)) {
+            next.valueTagIds = Array.from(new Set(next.valueTagIds));
           }
           arr[i] = next;
         }
@@ -626,27 +679,27 @@ export function useJourney() {
       }),
 
     reset: () =>
-      setDoc((d) => {
-        past.current.push(d);
+      (() => {
+        past.current.push(docRef.current);
         if (past.current.length > HISTORY_LIMIT) past.current.shift();
         future.current = [];
-        bumpHistory();
-        return seedDoc;
-      }),
+        commitDoc(seedDoc);
+        setPastLen(past.current.length);
+        setFutureLen(0);
+      })(),
     importDoc: (next: JourneyDoc) =>
-      setDoc((d) => {
-        past.current.push(d);
+      (() => {
+        past.current.push(docRef.current);
         if (past.current.length > HISTORY_LIMIT) past.current.shift();
         future.current = [];
-        bumpHistory();
-        return next;
-      }),
+        commitDoc(next);
+        setPastLen(past.current.length);
+        setFutureLen(0);
+      })(),
 
     undo,
     redo,
-    canUndo: past.current.length > 0,
-    canRedo: future.current.length > 0,
-    // expose tick to satisfy lint usage and force consumers to re-render on history change
-    _historyTick: historyTick,
+    canUndo: pastLen > 0,
+    canRedo: futureLen > 0,
   };
 }

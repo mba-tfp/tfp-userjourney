@@ -179,15 +179,10 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                     key={s.id}
                     stage={s}
                     index={i}
-                    valueTags={doc.valueTags}
-                    showMoneyOnFire={showMoneyOnFire}
                     onRename={(patch) => j.setStage(s.id, patch)}
-                    onValueChange={(valueTagIds) => j.setStage(s.id, { valueTagIds })}
-                    onToggleOnFire={() => j.toggleStageOnFire(s.id)}
                     onDelete={() => {
                       if (confirm(`Delete stage "${s.title}"?`)) j.deleteStage(s.id);
                     }}
-                    onManageValueTags={onManageTags}
                   />
                 ))}
               </SortableContext>
@@ -211,6 +206,7 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                 sub={b.sub}
                 stages={doc.stages}
                 tags={doc.tags}
+                valueTags={doc.valueTags}
                 linesForCell={(stageId) => linesForCell(stageId, b.key)}
                 showMoneyOnFire={showMoneyOnFire}
                 activeLineId={
@@ -220,6 +216,9 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                   j.updateLine(stageId, lineId, patch)
                 }
                 onDeleteLine={(stageId, lineId) => j.deleteLine(stageId, lineId)}
+                onToggleLineOnFire={(stageId, lineId) =>
+                  j.toggleLineOnFire(stageId, lineId)
+                }
                 onAddLine={(stageId) => j.addLine(stageId, b.key === "exists")}
                 onManageTags={onManageTags}
               />
@@ -255,23 +254,13 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
 function StageHeader({
   stage,
   index,
-  valueTags,
-  showMoneyOnFire,
   onRename,
-  onValueChange,
-  onToggleOnFire,
   onDelete,
-  onManageValueTags,
 }: {
   stage: import("@/lib/journey-data").Stage;
   index: number;
-  valueTags: Tag[];
-  showMoneyOnFire: boolean;
   onRename: (patch: Partial<import("@/lib/journey-data").Stage>) => void;
-  onValueChange: (next: string[]) => void;
-  onToggleOnFire: () => void;
   onDelete: () => void;
-  onManageValueTags: () => void;
 }) {
   const id = `stage:${stage.id}`;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -281,14 +270,12 @@ function StageHeader({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-  const fire = showMoneyOnFire && !!stage.onFire;
   return (
     <th
       ref={setNodeRef}
       style={style}
       className={cn(
         "group sticky top-0 z-10 bg-card border-b border-r border-border p-3 text-left align-top min-w-[280px] max-w-[320px]",
-        fire && "bg-destructive/5",
         isDragging && "shadow-lg",
       )}
     >
@@ -332,28 +319,6 @@ function StageHeader({
               </div>
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-            <TagPicker
-              tags={valueTags}
-              values={stage.valueTagIds}
-              onChange={onValueChange}
-              onManage={onManageValueTags}
-              placeholder="Value"
-              manageLabel="Manage value tags…"
-            />
-            <button
-              onClick={onToggleOnFire}
-              title={stage.onFire ? "Unmark money on fire" : "Mark money on fire"}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition",
-                stage.onFire
-                  ? "bg-destructive text-destructive-foreground border-destructive"
-                  : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary",
-              )}
-            >
-              <Flame className="h-3 w-3" /> Fire
-            </button>
-          </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -386,11 +351,13 @@ function BucketRow({
   sub,
   stages,
   tags,
+  valueTags,
   linesForCell,
   showMoneyOnFire,
   activeLineId,
   onUpdateLine,
   onDeleteLine,
+  onToggleLineOnFire,
   onAddLine,
   onManageTags,
 }: {
@@ -399,11 +366,13 @@ function BucketRow({
   sub: string;
   stages: import("@/lib/journey-data").Stage[];
   tags: Tag[];
+  valueTags: Tag[];
   linesForCell: (stageId: string) => Line[];
   showMoneyOnFire: boolean;
   activeLineId: string | null;
   onUpdateLine: (stageId: string, lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (stageId: string, lineId: string) => void;
+  onToggleLineOnFire: (stageId: string, lineId: string) => void;
   onAddLine: (stageId: string) => void;
   onManageTags: () => void;
 }) {
@@ -435,12 +404,14 @@ function BucketRow({
           key={s.id}
           stageId={s.id}
           bucket={bucket}
-          fire={showMoneyOnFire && !!s.onFire}
           lines={linesForCell(s.id)}
           tags={tags}
+          valueTags={valueTags}
+          showMoneyOnFire={showMoneyOnFire}
           activeLineId={activeLineId}
           onUpdateLine={(lineId, patch) => onUpdateLine(s.id, lineId, patch)}
           onDeleteLine={(lineId) => onDeleteLine(s.id, lineId)}
+          onToggleLineOnFire={(lineId) => onToggleLineOnFire(s.id, lineId)}
           onAddLine={() => onAddLine(s.id)}
           onManageTags={onManageTags}
         />
@@ -460,23 +431,27 @@ function BucketRow({
 function Cell({
   stageId,
   bucket,
-  fire,
   lines,
   tags,
+  valueTags,
+  showMoneyOnFire,
   activeLineId,
   onUpdateLine,
   onDeleteLine,
+  onToggleLineOnFire,
   onAddLine,
   onManageTags,
 }: {
   stageId: string;
   bucket: Bucket;
-  fire: boolean;
   lines: Line[];
   tags: Tag[];
+  valueTags: Tag[];
+  showMoneyOnFire: boolean;
   activeLineId: string | null;
   onUpdateLine: (lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (lineId: string) => void;
+  onToggleLineOnFire: (lineId: string) => void;
   onAddLine: () => void;
   onManageTags: () => void;
 }) {
@@ -502,7 +477,6 @@ function Cell({
       className={cn(
         "border-b border-r border-border p-2 align-top min-w-[280px] max-w-[320px] transition-colors relative",
         isGap && "bg-destructive/[0.02]",
-        fire && "bg-destructive/[0.05]",
         isOver && !!activeLineId && "bg-primary/[0.06] ring-1 ring-inset ring-primary/30",
       )}
     >
@@ -515,9 +489,12 @@ function Cell({
               stageId={stageId}
               bucket={bucket}
               tags={tags}
+              valueTags={valueTags}
+              showMoneyOnFire={showMoneyOnFire}
               activeLineId={activeLineId}
               onUpdate={(patch) => onUpdateLine(l.id, patch)}
               onDelete={() => onDeleteLine(l.id)}
+              onToggleOnFire={() => onToggleLineOnFire(l.id)}
               onManageTags={onManageTags}
             />
           ))}
@@ -546,18 +523,24 @@ function SortableLine({
   stageId,
   bucket,
   tags,
+  valueTags,
+  showMoneyOnFire,
   activeLineId,
   onUpdate,
   onDelete,
+  onToggleOnFire,
   onManageTags,
 }: {
   line: Line;
   stageId: string;
   bucket: Bucket;
   tags: Tag[];
+  valueTags: Tag[];
+  showMoneyOnFire: boolean;
   activeLineId: string | null;
   onUpdate: (patch: Partial<Line>) => void;
   onDelete: () => void;
+  onToggleOnFire: () => void;
   onManageTags: () => void;
 }) {
   const sortableId = `line:${stageId}:${bucket}:${line.id}`;
@@ -578,6 +561,8 @@ function SortableLine({
     opacity: isDragging ? 0.3 : 1,
   };
   const showDropBar = isOver && !!activeLineId && activeLineId !== line.id;
+  const isFire = !!line.onFire;
+  const dim = showMoneyOnFire && !isFire;
 
   return (
     <li
@@ -588,6 +573,8 @@ function SortableLine({
         line.exists
           ? "bg-background border-border text-foreground/90"
           : "bg-destructive/[0.05] border-dashed border-destructive/40 text-foreground/80",
+        isFire && "ring-1 ring-destructive/60 bg-destructive/[0.07]",
+        dim && "opacity-40",
       )}
     >
       {showDropBar && (
@@ -613,22 +600,43 @@ function SortableLine({
             placeholder="Add a note…"
             label="Edit line"
           />
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             <TagPicker
               tags={tags}
               values={line.tagIds}
               onChange={(tagIds) => onUpdate({ tagIds })}
               onManage={onManageTags}
             />
+            <TagPicker
+              tags={valueTags}
+              values={line.valueTagIds ?? []}
+              onChange={(valueTagIds) => onUpdate({ valueTagIds })}
+              onManage={onManageTags}
+              placeholder="Value"
+              manageLabel="Manage value tags…"
+            />
           </div>
         </div>
       </div>
-      <div className="absolute right-1 top-1 opacity-0 group-hover/line:opacity-100 focus-within:opacity-100 transition">
+      <div className="absolute right-1 top-1 flex items-center gap-0.5">
+        <button
+          onClick={onToggleOnFire}
+          aria-label={isFire ? "Unmark money on fire" : "Mark money on fire"}
+          title={isFire ? "Unmark money on fire" : "Mark money on fire"}
+          className={cn(
+            "rounded p-0.5 transition",
+            isFire
+              ? "text-destructive opacity-100"
+              : "text-muted-foreground opacity-0 group-hover/line:opacity-100 focus:opacity-100 hover:bg-background hover:text-foreground",
+          )}
+        >
+          <Flame className="h-3 w-3" />
+        </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               aria-label="Line options"
-              className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground data-[state=open]:opacity-100"
+              className="rounded p-0.5 text-muted-foreground opacity-0 group-hover/line:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 hover:bg-background hover:text-foreground transition"
             >
               <MoreHorizontal className="h-3 w-3" />
             </button>
