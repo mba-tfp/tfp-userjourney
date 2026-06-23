@@ -254,10 +254,15 @@ export function useJourney() {
   // Undo / redo history of doc snapshots.
   const past = useRef<JourneyDoc[]>([]);
   const future = useRef<JourneyDoc[]>([]);
-  const skipHistory = useRef(false);
   const HISTORY_LIMIT = 100;
-  const [historyTick, setHistoryTick] = useState(0);
-  const bumpHistory = () => setHistoryTick((n) => n + 1);
+  const [pastLen, setPastLen] = useState(0);
+  const [futureLen, setFutureLen] = useState(0);
+  const docRef = useRef<JourneyDoc>(seedDoc);
+
+  const commitDoc = useCallback((next: JourneyDoc) => {
+    docRef.current = next;
+    setDoc(next);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,26 +270,24 @@ export function useJourney() {
       try {
         const { doc: stored } = await load();
         if (cancelled) return;
-        skipHistory.current = true;
         if (stored) {
           const normalized = normalize(stored);
           const { doc: merged, changed } = mergeSeedGaps(normalized);
-          setDoc(merged);
+          commitDoc(merged);
           if (changed) {
             save({ data: { doc: merged } }).catch((e) =>
               console.error("Failed to persist seed-gap merge", e),
             );
           }
         } else {
-          setDoc(seedDoc);
+          commitDoc(seedDoc);
           // Seed the row so subsequent saves upsert cleanly.
           await save({ data: { doc: seedDoc } });
         }
       } catch (e) {
         console.error("Failed to load journey", e);
         if (!cancelled) {
-          skipHistory.current = true;
-          setDoc(seedDoc);
+          commitDoc(seedDoc);
         }
       } finally {
         if (!cancelled) setHydrated(true);
@@ -293,7 +296,7 @@ export function useJourney() {
     return () => {
       cancelled = true;
     };
-  }, [load, save]);
+  }, [load, save, commitDoc]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -307,39 +310,33 @@ export function useJourney() {
   }, [doc, hydrated, save]);
 
   const update = useCallback((fn: (d: JourneyDoc) => JourneyDoc) => {
-    setDoc((d) => {
-      if (!skipHistory.current) {
-        past.current.push(d);
-        if (past.current.length > HISTORY_LIMIT) past.current.shift();
-        if (future.current.length) future.current = [];
-        bumpHistory();
-      }
-      skipHistory.current = false;
-      return fn(structuredClone(d));
-    });
-  }, []);
+    const prev = docRef.current;
+    past.current.push(prev);
+    if (past.current.length > HISTORY_LIMIT) past.current.shift();
+    future.current = [];
+    const next = fn(structuredClone(prev));
+    commitDoc(next);
+    setPastLen(past.current.length);
+    setFutureLen(0);
+  }, [commitDoc]);
 
   const undo = useCallback(() => {
-    setDoc((d) => {
-      const prev = past.current.pop();
-      if (!prev) return d;
-      future.current.push(d);
-      skipHistory.current = true;
-      bumpHistory();
-      return prev;
-    });
-  }, []);
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(docRef.current);
+    commitDoc(prev);
+    setPastLen(past.current.length);
+    setFutureLen(future.current.length);
+  }, [commitDoc]);
 
   const redo = useCallback(() => {
-    setDoc((d) => {
-      const next = future.current.pop();
-      if (!next) return d;
-      past.current.push(d);
-      skipHistory.current = true;
-      bumpHistory();
-      return next;
-    });
-  }, []);
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(docRef.current);
+    commitDoc(next);
+    setPastLen(past.current.length);
+    setFutureLen(future.current.length);
+  }, [commitDoc]);
 
   // Global keyboard shortcuts: Cmd/Ctrl+Z = undo, Shift+Cmd/Ctrl+Z or Ctrl+Y = redo.
   useEffect(() => {
@@ -440,12 +437,26 @@ export function useJourney() {
         if (s) s.onFire = !s.onFire;
         return d;
       }),
+    toggleLineOnFire: (stageId: string, lineId: string) =>
+      update((d) => {
+        const arr = d.lines[stageId];
+        if (!arr) return d;
+        const i = arr.findIndex((l) => l.id === lineId);
+        if (i >= 0) arr[i] = { ...arr[i], onFire: !arr[i].onFire };
+        return d;
+      }),
 
     // Line CRUD
     addLine: (stageId: string, exists: boolean) =>
       update((d) => {
         d.lines[stageId] = d.lines[stageId] ?? [];
-        d.lines[stageId].push({ id: newId("ln"), text: "", exists, tagIds: [] });
+        d.lines[stageId].push({
+          id: newId("ln"),
+          text: "",
+          exists,
+          tagIds: [],
+          valueTagIds: [],
+        });
         return d;
       }),
     addLineInCell: (stageId: string, tagId: string | null) =>
@@ -456,6 +467,7 @@ export function useJourney() {
           text: "",
           exists: true,
           tagIds: tagId ? [tagId] : [],
+          valueTagIds: [],
         });
         return d;
       }),
@@ -468,6 +480,9 @@ export function useJourney() {
           const next = { ...arr[i], ...patch };
           if (Array.isArray(next.tagIds)) {
             next.tagIds = Array.from(new Set(next.tagIds));
+          }
+          if (Array.isArray(next.valueTagIds)) {
+            next.valueTagIds = Array.from(new Set(next.valueTagIds));
           }
           arr[i] = next;
         }
