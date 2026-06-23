@@ -135,9 +135,16 @@ function normalize(raw: any): JourneyDoc {
       emoji: s.emoji,
       title: s.title,
       subtitle: s.subtitle,
-      valueTagIds,
+      // Stage-level value tags are migrated onto each line below; keep the
+      // field on the stage for back-compat but clear it so the UI no longer
+      // reads it.
+      valueTagIds: [],
+      // Stage-level onFire is migrated onto gap lines below.
+      _migrateValueTagIds: valueTagIds,
+      _migrateOnFire:
+        typeof s.onFire === "boolean" ? s.onFire : seedDoc.stages[i]?.onFire ?? false,
       onFire: typeof s.onFire === "boolean" ? s.onFire : seedDoc.stages[i]?.onFire ?? false,
-    };
+    } as Stage & { _migrateValueTagIds: string[]; _migrateOnFire: boolean };
   });
   // Identify any legacy "exists today" / "doesn't exist today" tags and migrate
   // their membership onto the line.exists boolean (bucket), then strip the tags.
@@ -164,13 +171,22 @@ function normalize(raw: any): JourneyDoc {
   const isBucketTag = (id: string) => existsTagIds.has(id) || gapTagIds.has(id);
 
   const lines: Record<string, Line[]> = {};
-  const onFireById = new Map(stages.map((s) => [s.id, !!s.onFire]));
+  const stageMigrateById = new Map(
+    (stages as any[]).map((s) => [
+      s.id,
+      {
+        onFire: !!s._migrateOnFire,
+        valueTagIds: (s._migrateValueTagIds as string[]) ?? [],
+      },
+    ]),
+  );
   const clampScore = (n: unknown, fallback: number) => {
     const v = typeof n === "number" && Number.isFinite(n) ? Math.round(n) : fallback;
     return Math.max(1, Math.min(5, v));
   };
   for (const [sid, arr] of Object.entries((raw?.lines ?? {}) as Record<string, any[]>)) {
-    const onFire = onFireById.get(sid) ?? false;
+    const migrate = stageMigrateById.get(sid) ?? { onFire: false, valueTagIds: [] };
+    const stageOnFire = migrate.onFire;
     lines[sid] = (arr ?? []).map((l: any) => {
       const rawIds: string[] = Array.isArray(l.tagIds)
         ? l.tagIds.filter(Boolean)
@@ -181,24 +197,41 @@ function normalize(raw: any): JourneyDoc {
       if (rawIds.some((id) => gapTagIds.has(id))) exists = false;
       else if (rawIds.some((id) => existsTagIds.has(id))) exists = true;
       // Seed scores from signals when missing.
-      const seedUrgency = !exists ? (onFire ? 4 : 3) : 2;
-      const seedImpact = onFire ? 4 : 3;
+      const seedUrgency = !exists ? (stageOnFire ? 4 : 3) : 2;
+      const seedImpact = stageOnFire ? 4 : 3;
+      // Per-line valueTagIds: prefer stored values, otherwise migrate from
+      // the stage. Per-line onFire: prefer stored value, otherwise inherit
+      // the stage flag for gap lines only.
+      const storedLineValueTagIds: string[] = Array.isArray(l.valueTagIds)
+        ? l.valueTagIds.filter(Boolean)
+        : [];
+      const valueTagIds =
+        storedLineValueTagIds.length > 0
+          ? Array.from(new Set(storedLineValueTagIds))
+          : Array.from(new Set(migrate.valueTagIds));
+      const lineOnFire =
+        typeof l.onFire === "boolean" ? l.onFire : !exists && stageOnFire;
       return {
         id: l.id,
         text: l.text ?? "",
         exists,
         tagIds: rawIds.filter((id) => !isBucketTag(id)),
+        valueTagIds,
+        onFire: lineOnFire,
         impact: clampScore(l.impact, seedImpact),
         urgency: clampScore(l.urgency, seedUrgency),
         effort: clampScore(l.effort, 3),
       };
     });
   }
-  // Strip bucket tags from stage valueTagIds defensively, and from doc.tags.
+  // Strip bucket tags from doc.tags.
   const cleanedStages = stages.map((s) => ({
-    ...s,
-    valueTagIds: s.valueTagIds.filter((id) => !isBucketTag(id)),
-  }));
+    id: s.id,
+    emoji: s.emoji,
+    title: s.title,
+    subtitle: s.subtitle,
+    valueTagIds: [] as string[],
+  })) as Stage[];
   const cleanedTags: Tag[] = rawTags
     .filter((t) => !isBucketTag(t.id))
     .map((t) => ({ id: t.id, name: t.name, color: t.color }));
