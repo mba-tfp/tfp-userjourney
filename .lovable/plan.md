@@ -1,25 +1,33 @@
-## Goal
-Remove the map view and promote the roadmap (currently `/conclusion`) to be the home page at `/`.
+## Add gap lines to journey seed data
 
-## Changes
+Append new `exists: false` lines to each of the 11 stages in `src/lib/journey-data.ts`. Existing lines, stages, tags, and structure remain untouched.
 
-1. **Promote roadmap to home**
-   - Rename `src/routes/_authenticated/conclusion.tsx` → `src/routes/_authenticated/index.tsx` (overwriting the current index).
-   - Update `createFileRoute("/_authenticated/conclusion")` → `createFileRoute("/_authenticated/")`.
-   - Remove the "Back to map" link in the header.
-   - Add the `head()` meta block (title, description, OG) from the old index so SEO is preserved.
+### Where the change lands
 
-2. **Delete the map view**
-   - Delete `src/components/journey/JourneyMap.tsx`.
-   - Delete `src/components/journey/LineListCard.tsx` and `src/components/journey/StageLifecycle.tsx` if they're only used by `JourneyMap` (will verify before deleting; keep any that `RoadmapTable` / `LineRow` still import).
+The seed data is built from `sourceRows` in `src/lib/journey-data.ts`. Rather than reshape that table, I'll append the new gap lines directly inside the `stages.forEach(...)` builder loop after the existing `sourceRows` lines are pushed — keeping the original data structure intact and isolating the additions in one block.
 
-3. **Fix stale links**
-   - Search for any `to="/conclusion"` or `Link`/`navigate` references and either remove them or point them at `/`.
-   - `routeTree.gen.ts` regenerates automatically — no manual edit.
+### Tag assignment (using existing tags only: Patient, Clinic, TFP, Channel)
 
-4. **Header copy**
-   - Drop the "Conclusion · Roadmap" eyebrow label, or shorten it to just "Roadmap", since it's now the only view.
+Each new item gets one tag based on who owns/operates the missing capability:
 
-## Out of scope
-- No changes to the data model, store, drag-and-drop, tags, or auth.
-- No redirect from `/conclusion` — the route simply ceases to exist (acceptable since the app is internal and not yet widely shared at that URL).
+- **Stage 1** — HCP hub → Channel; Pre-referral education → Patient; Fertility preservation tool → Patient
+- **Stage 2** — Success calculator → Patient; Cost estimator → Patient; Competitor comparison → TFP
+- **Stage 3** — HCP referral portal → Channel; Self-referral smart intake → Patient; Cross-clinic lookup → Clinic
+- **Stage 4** — Smart form routing → Patient; REI waitlist visibility → Patient; Partner onboarding → Patient
+- **Stage 5** — Lab results to portal → Patient; Automated requisition dispatch → Clinic; Plain-language interpretation → Patient
+- **Stage 6** — Self-serve booking → Patient; GP notification → Channel; Pre-consult checklist → Patient
+- **Stage 7** — Pre-consult AI summary → Clinic; Post-consult summary → Patient; FertiWise integrated → TFP
+- **Stage 8** — Cycle calendar → Patient; Funded waitlist visibility → Patient; Medication delivery → Channel; Financial planning tool → Patient
+- **Stage 9** — Proactive embryo updates → Patient; Emotional support pathway → Patient; Funded vs private segmentation → Clinic
+- **Stage 10** — Post-outcome pathway → Patient; Mental health referral automation → Patient; OB handoff letter → Channel; OttoPulse post-outcome NPS → TFP
+- **Stage 11** — Cryo renewal reminders → Patient; Re-entry pathway → Patient; Long-term HCP engagement → Channel; Sibling cycle fast-track → Patient
+
+### Technical detail
+
+In `src/lib/journey-data.ts`, after the existing `stages.forEach((stage, si) => { ... })` block, add a parallel mapping `EXTRA_GAPS: Array<Array<{ text: string; tagName: 'Patient'|'Clinic'|'TFP'|'Channel' }>>` indexed by stage index (0–10), then loop and push each entry into `lines[stage.id]` with `exists: false`, `tagIds: [TAG_BY_NAME[tagName]]`, and a unique id continuing the per-stage counter.
+
+No UI, store, route, or component changes. The roadmap automatically renders the new lines under "What Doesn't Exist Today" via existing logic.
+
+### Out of scope
+
+No new tags, no stage edits, no edits to existing lines, no schema/store changes.
