@@ -5,6 +5,11 @@ export type Line = {
   text: string;
   tagIds: string[];
   exists: boolean;
+  // Per-line value tag(s): Capacity / Revenue / Cost (and any user-added).
+  // Replaces the prior stage-level valueTagIds.
+  valueTagIds?: string[];
+  // Per-line "money on fire" flag. Replaces the prior stage-level onFire.
+  onFire?: boolean;
   // Prioritization scores (1–5) used in the quadrant view. Optional —
   // auto-seeded by the store on load when missing.
   impact?: number;
@@ -73,6 +78,13 @@ const stages: Stage[] = stageDefs.map(({ value, ...rest }, i) => ({
   valueTagIds: [VALUE_TAG_IDS[value]],
   onFire: ON_FIRE_INDEXES.has(i),
 }));
+
+// Helper: per-stage value tag (copied onto every line of that stage so the
+// previously-column-level value tag is now expressed on each line).
+const stageValueTagId: Record<string, string> = {};
+stageDefs.forEach((def, i) => {
+  stageValueTagId[stages[i].id] = VALUE_TAG_IDS[def.value];
+});
 
 // Tag palette (semantic-ish; works in light theme)
 export const TAG_COLORS = [
