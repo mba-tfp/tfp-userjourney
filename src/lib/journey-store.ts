@@ -6,6 +6,7 @@ import {
   VALUE_TAG_IDS,
   BLOOMIC_LINE_TEXTS,
   BLOOMIC_TAG_NAME,
+  FIRE_GAP_LINES,
   type JourneyDoc,
   type Line,
   type Stage,
