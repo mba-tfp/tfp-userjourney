@@ -61,14 +61,8 @@ function ConclusionPage() {
       <header className="border-b border-border bg-background/90 backdrop-blur sticky top-0 z-30">
         <div className="mx-auto max-w-[1700px] px-8 py-6 flex items-start justify-between gap-6">
           <div>
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to map
-            </Link>
-            <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-              Conclusion · Roadmap
+            <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+              Roadmap
             </div>
             <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
               {doc.title}
