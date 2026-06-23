@@ -523,18 +523,24 @@ function SortableLine({
   stageId,
   bucket,
   tags,
+  valueTags,
+  showMoneyOnFire,
   activeLineId,
   onUpdate,
   onDelete,
+  onToggleOnFire,
   onManageTags,
 }: {
   line: Line;
   stageId: string;
   bucket: Bucket;
   tags: Tag[];
+  valueTags: Tag[];
+  showMoneyOnFire: boolean;
   activeLineId: string | null;
   onUpdate: (patch: Partial<Line>) => void;
   onDelete: () => void;
+  onToggleOnFire: () => void;
   onManageTags: () => void;
 }) {
   const sortableId = `line:${stageId}:${bucket}:${line.id}`;
@@ -555,6 +561,8 @@ function SortableLine({
     opacity: isDragging ? 0.3 : 1,
   };
   const showDropBar = isOver && !!activeLineId && activeLineId !== line.id;
+  const isFire = !!line.onFire;
+  const dim = showMoneyOnFire && !isFire;
 
   return (
     <li
@@ -565,6 +573,8 @@ function SortableLine({
         line.exists
           ? "bg-background border-border text-foreground/90"
           : "bg-destructive/[0.05] border-dashed border-destructive/40 text-foreground/80",
+        isFire && "ring-1 ring-destructive/60 bg-destructive/[0.07]",
+        dim && "opacity-40",
       )}
     >
       {showDropBar && (
@@ -590,22 +600,43 @@ function SortableLine({
             placeholder="Add a note…"
             label="Edit line"
           />
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             <TagPicker
               tags={tags}
               values={line.tagIds}
               onChange={(tagIds) => onUpdate({ tagIds })}
               onManage={onManageTags}
             />
+            <TagPicker
+              tags={valueTags}
+              values={line.valueTagIds ?? []}
+              onChange={(valueTagIds) => onUpdate({ valueTagIds })}
+              onManage={onManageTags}
+              placeholder="Value"
+              manageLabel="Manage value tags…"
+            />
           </div>
         </div>
       </div>
-      <div className="absolute right-1 top-1 opacity-0 group-hover/line:opacity-100 focus-within:opacity-100 transition">
+      <div className="absolute right-1 top-1 flex items-center gap-0.5">
+        <button
+          onClick={onToggleOnFire}
+          aria-label={isFire ? "Unmark money on fire" : "Mark money on fire"}
+          title={isFire ? "Unmark money on fire" : "Mark money on fire"}
+          className={cn(
+            "rounded p-0.5 transition",
+            isFire
+              ? "text-destructive opacity-100"
+              : "text-muted-foreground opacity-0 group-hover/line:opacity-100 focus:opacity-100 hover:bg-background hover:text-foreground",
+          )}
+        >
+          <Flame className="h-3 w-3" />
+        </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               aria-label="Line options"
-              className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground data-[state=open]:opacity-100"
+              className="rounded p-0.5 text-muted-foreground opacity-0 group-hover/line:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 hover:bg-background hover:text-foreground transition"
             >
               <MoreHorizontal className="h-3 w-3" />
             </button>
