@@ -237,6 +237,7 @@ stages.forEach((stage, si) => {
         text: sl.text,
         tagIds: tagId ? [tagId] : [],
         exists: !sl.gap,
+        valueTagIds: [stageValueTagId[stage.id]],
       });
     });
   });
@@ -328,6 +329,7 @@ stages.forEach((stage, si) => {
       text: eg.text,
       tagIds: tagId ? [tagId] : [],
       exists: false,
+      valueTagIds: [stageValueTagId[stage.id]],
     });
   });
 });
@@ -369,6 +371,8 @@ if (tfpTagId) {
         text: fg.text,
         tagIds: [tfpTagId],
         exists: false,
+        onFire: true,
+        valueTagIds: [stageValueTagId[stage.id]],
       },
       ...(lines[stage.id] ?? []),
     ];
@@ -517,6 +521,7 @@ for (const al of ADDITIONAL_LENS_LINES) {
     text: al.text,
     tagIds: tagId ? [tagId] : [],
     exists: true,
+    valueTagIds: [stageValueTagId[stage.id]],
   });
 }
 
