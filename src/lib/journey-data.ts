@@ -320,6 +320,49 @@ stages.forEach((stage, si) => {
   });
 });
 
+// Top-of-stage TFP impact statements for the five "money on fire" stages.
+// Prepended so they render as the first line in each gap cell. Exported for
+// the store migration to apply to already-stored docs.
+export const FIRE_GAP_LINES: ReadonlyArray<{ stageIndex: number; text: string }> = [
+  {
+    stageIndex: 4, // Stage 5 — Pre-Diagnostic Testing
+    text: "~30-day delay between referral and first diagnostic result. Every week of delay is a week the patient considers a competitor.",
+  },
+  {
+    stageIndex: 5, // Stage 6 — Notify & Schedule
+    text: "No self-serve booking means a coordinator call is required for every new patient. At 40+ new patients per week network-wide, that is 2,000+ manual booking calls per year.",
+  },
+  {
+    stageIndex: 8, // Stage 9 — The Wait
+    text: "30% of patients who experience a failed outcome do not return. At an average cycle value of $15,000-$25,000 CAD, each prevented churn event is worth $15K-$25K in recovered LTV.",
+  },
+  {
+    stageIndex: 9, // Stage 10 — Outcome & Transition
+    text: "No structured post-outcome pathway means TFP has no touchpoint at the most emotionally significant moment in the patient journey. This is the single highest-leverage retention intervention available.",
+  },
+  {
+    stageIndex: 10, // Stage 11 — Continuity of Care
+    text: "Re-entry rate is currently 40% against a 60% target. Closing that gap across the network represents the highest-ROI growth lever that does not require acquiring a single new patient.",
+  },
+];
+
+const tfpTagId = TAG_BY_NAME["TFP"];
+if (tfpTagId) {
+  for (const fg of FIRE_GAP_LINES) {
+    const stage = stages[fg.stageIndex];
+    if (!stage) continue;
+    lines[stage.id] = [
+      {
+        id: uid(`${stage.id}-fire`, 1),
+        text: fg.text,
+        tagIds: [tfpTagId],
+        exists: false,
+      },
+      ...(lines[stage.id] ?? []),
+    ];
+  }
+}
+
 // Apply the Bloomic tag to any gap line whose text matches one of the
 // Bloomic-owned capabilities (online booking, intake forms, triage, consents,
 // cycle planning, patient portal, surveys/ratings, basic reminders). Exported
