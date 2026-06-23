@@ -7,6 +7,7 @@ import {
   BLOOMIC_LINE_TEXTS,
   BLOOMIC_TAG_NAME,
   FIRE_GAP_LINES,
+  ADDITIONAL_LENS_LINES,
   type JourneyDoc,
   type Line,
   type Stage,
@@ -87,6 +88,27 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
       ];
       changed = true;
     }
+  }
+
+  // Append additional lens-row commentary lines (exists: true) that are
+  // missing from a stored doc, matched by exact text within the same stage.
+  const tagIdByName = new Map(next.tags.map((t) => [t.name, t.id]));
+  for (const al of ADDITIONAL_LENS_LINES) {
+    const stage = seedDoc.stages[al.stageIndex];
+    if (!stage) continue;
+    const arr = next.lines[stage.id] ?? [];
+    if (arr.some((l) => l.text.trim() === al.text.trim())) continue;
+    const tagId = tagIdByName.get(al.tagName);
+    next.lines[stage.id] = [
+      ...arr,
+      {
+        id: newId("ln"),
+        text: al.text,
+        tagIds: tagId ? [tagId] : [],
+        exists: true,
+      },
+    ];
+    changed = true;
   }
 
   return { doc: next, changed };
