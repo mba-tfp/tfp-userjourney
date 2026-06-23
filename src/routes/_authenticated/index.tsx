@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Flame, Tag as TagIcon, LogOut, Undo2, Redo2 } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Flame, Tag as TagIcon, LogOut, Undo2, Redo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useJourney } from "@/lib/journey-store";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,14 @@ import type { TagColor } from "@/lib/journey-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/")({
+  head: () => ({
+    meta: [
+      { title: "otto Multi-lenses Journey" },
+      { name: "description", content: "Interactive, editable multi-lens patient journey roadmap." },
+      { property: "og:title", content: "otto Multi-lenses Journey" },
+      { property: "og:description", content: "Interactive, editable multi-lens patient journey roadmap." },
+    ],
+  }),
   component: ConclusionPage,
 });
 
