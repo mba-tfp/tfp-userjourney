@@ -11,6 +11,34 @@ import {
 } from "./journey-data";
 import { loadJourney, saveJourney } from "./journey.functions";
 
+// One-time migration: append any seed gap lines (exists: false) that are missing
+// from a stored doc, matched by exact text within the same stage. Idempotent.
+function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
+  let changed = false;
+  const next: JourneyDoc = { ...doc, lines: { ...doc.lines } };
+  for (const stage of seedDoc.stages) {
+    const seedLines = seedDoc.lines[stage.id] ?? [];
+    const existing = next.lines[stage.id] ?? [];
+    const existingTexts = new Set(existing.map((l) => l.text.trim()));
+    const toAppend: Line[] = [];
+    for (const sl of seedLines) {
+      if (sl.exists) continue;
+      if (existingTexts.has(sl.text.trim())) continue;
+      toAppend.push({
+        id: newId("ln"),
+        text: sl.text,
+        tagIds: [...sl.tagIds],
+        exists: false,
+      });
+    }
+    if (toAppend.length) {
+      next.lines[stage.id] = [...existing, ...toAppend];
+      changed = true;
+    }
+  }
+  return { doc: next, changed };
+}
+
 // v2 docs stored stage.value as "capacity" | "revenue" | "cost" and had no valueTags/onFire
 // Normalize any prior shape (v2 single value string, v3 single tagId/valueTagId)
 // into the current multi-tag shape.
@@ -126,7 +154,14 @@ export function useJourney() {
         if (cancelled) return;
         skipHistory.current = true;
         if (stored) {
-          setDoc(normalize(stored));
+          const normalized = normalize(stored);
+          const { doc: merged, changed } = mergeSeedGaps(normalized);
+          setDoc(merged);
+          if (changed) {
+            save({ data: { doc: merged } }).catch((e) =>
+              console.error("Failed to persist seed-gap merge", e),
+            );
+          }
         } else {
           setDoc(seedDoc);
           // Seed the row so subsequent saves upsert cleanly.
