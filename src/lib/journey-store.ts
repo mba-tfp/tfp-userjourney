@@ -6,6 +6,7 @@ import {
   VALUE_TAG_IDS,
   BLOOMIC_LINE_TEXTS,
   BLOOMIC_TAG_NAME,
+  FIRE_GAP_LINES,
   type JourneyDoc,
   type Line,
   type Stage,
@@ -62,6 +63,28 @@ function mergeSeedGaps(doc: JourneyDoc): { doc: JourneyDoc; changed: boolean } {
     });
     if (stageChanged) {
       next.lines[stage.id] = updated;
+      changed = true;
+    }
+  }
+
+  // Prepend top-of-stage TFP impact statements for the "money on fire" stages,
+  // if not already present (matched by exact text).
+  const tfpTag = next.tags.find((t) => t.name === "TFP");
+  if (tfpTag) {
+    for (const fg of FIRE_GAP_LINES) {
+      const stage = seedDoc.stages[fg.stageIndex];
+      if (!stage) continue;
+      const arr = next.lines[stage.id] ?? [];
+      if (arr.some((l) => l.text.trim() === fg.text.trim())) continue;
+      next.lines[stage.id] = [
+        {
+          id: newId("ln"),
+          text: fg.text,
+          tagIds: [tfpTag.id],
+          exists: false,
+        },
+        ...arr,
+      ];
       changed = true;
     }
   }
