@@ -179,15 +179,10 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                     key={s.id}
                     stage={s}
                     index={i}
-                    valueTags={doc.valueTags}
-                    showMoneyOnFire={showMoneyOnFire}
                     onRename={(patch) => j.setStage(s.id, patch)}
-                    onValueChange={(valueTagIds) => j.setStage(s.id, { valueTagIds })}
-                    onToggleOnFire={() => j.toggleStageOnFire(s.id)}
                     onDelete={() => {
                       if (confirm(`Delete stage "${s.title}"?`)) j.deleteStage(s.id);
                     }}
-                    onManageValueTags={onManageTags}
                   />
                 ))}
               </SortableContext>
@@ -211,6 +206,7 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                 sub={b.sub}
                 stages={doc.stages}
                 tags={doc.tags}
+                valueTags={doc.valueTags}
                 linesForCell={(stageId) => linesForCell(stageId, b.key)}
                 showMoneyOnFire={showMoneyOnFire}
                 activeLineId={
@@ -220,6 +216,9 @@ export function RoadmapTable({ showMoneyOnFire, onManageTags }: Props) {
                   j.updateLine(stageId, lineId, patch)
                 }
                 onDeleteLine={(stageId, lineId) => j.deleteLine(stageId, lineId)}
+                onToggleLineOnFire={(stageId, lineId) =>
+                  j.toggleLineOnFire(stageId, lineId)
+                }
                 onAddLine={(stageId) => j.addLine(stageId, b.key === "exists")}
                 onManageTags={onManageTags}
               />
