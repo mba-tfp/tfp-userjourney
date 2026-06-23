@@ -351,11 +351,13 @@ function BucketRow({
   sub,
   stages,
   tags,
+  valueTags,
   linesForCell,
   showMoneyOnFire,
   activeLineId,
   onUpdateLine,
   onDeleteLine,
+  onToggleLineOnFire,
   onAddLine,
   onManageTags,
 }: {
@@ -364,11 +366,13 @@ function BucketRow({
   sub: string;
   stages: import("@/lib/journey-data").Stage[];
   tags: Tag[];
+  valueTags: Tag[];
   linesForCell: (stageId: string) => Line[];
   showMoneyOnFire: boolean;
   activeLineId: string | null;
   onUpdateLine: (stageId: string, lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (stageId: string, lineId: string) => void;
+  onToggleLineOnFire: (stageId: string, lineId: string) => void;
   onAddLine: (stageId: string) => void;
   onManageTags: () => void;
 }) {
@@ -400,12 +404,14 @@ function BucketRow({
           key={s.id}
           stageId={s.id}
           bucket={bucket}
-          fire={showMoneyOnFire && !!s.onFire}
           lines={linesForCell(s.id)}
           tags={tags}
+          valueTags={valueTags}
+          showMoneyOnFire={showMoneyOnFire}
           activeLineId={activeLineId}
           onUpdateLine={(lineId, patch) => onUpdateLine(s.id, lineId, patch)}
           onDeleteLine={(lineId) => onDeleteLine(s.id, lineId)}
+          onToggleLineOnFire={(lineId) => onToggleLineOnFire(s.id, lineId)}
           onAddLine={() => onAddLine(s.id)}
           onManageTags={onManageTags}
         />
@@ -425,23 +431,27 @@ function BucketRow({
 function Cell({
   stageId,
   bucket,
-  fire,
   lines,
   tags,
+  valueTags,
+  showMoneyOnFire,
   activeLineId,
   onUpdateLine,
   onDeleteLine,
+  onToggleLineOnFire,
   onAddLine,
   onManageTags,
 }: {
   stageId: string;
   bucket: Bucket;
-  fire: boolean;
   lines: Line[];
   tags: Tag[];
+  valueTags: Tag[];
+  showMoneyOnFire: boolean;
   activeLineId: string | null;
   onUpdateLine: (lineId: string, patch: Partial<Line>) => void;
   onDeleteLine: (lineId: string) => void;
+  onToggleLineOnFire: (lineId: string) => void;
   onAddLine: () => void;
   onManageTags: () => void;
 }) {
@@ -467,7 +477,6 @@ function Cell({
       className={cn(
         "border-b border-r border-border p-2 align-top min-w-[280px] max-w-[320px] transition-colors relative",
         isGap && "bg-destructive/[0.02]",
-        fire && "bg-destructive/[0.05]",
         isOver && !!activeLineId && "bg-primary/[0.06] ring-1 ring-inset ring-primary/30",
       )}
     >
@@ -480,9 +489,12 @@ function Cell({
               stageId={stageId}
               bucket={bucket}
               tags={tags}
+              valueTags={valueTags}
+              showMoneyOnFire={showMoneyOnFire}
               activeLineId={activeLineId}
               onUpdate={(patch) => onUpdateLine(l.id, patch)}
               onDelete={() => onDeleteLine(l.id)}
+              onToggleOnFire={() => onToggleLineOnFire(l.id)}
               onManageTags={onManageTags}
             />
           ))}
